@@ -1,0 +1,82 @@
+# Sao Kim BrandCare OS
+
+Hệ điều hành chăm sóc & phát triển thương hiệu cho khách hàng Sao Kim Branding.
+Sản phẩm thay thế PMS hiện tại, tổ chức theo 4 hub nghiệp vụ (Onboarding · Delivery · Growth · Retaining)
+nhưng chỉ bày ra **3 bề mặt trải nghiệm**: **Hôm nay** · **Workroom** · **Brand Home**.
+
+---
+
+## Bắt đầu
+
+```bash
+cp .env.example .env.local     # điền BETTER_AUTH_SECRET, DEEPSEEK_API_KEY
+npm install
+npm run db:migrate             # (có sau P2)
+npm run db:seed                # (có sau P2)
+npm run dev                    # http://localhost:3000
+```
+
+> Nếu ổ đĩa chật hoặc npm không ghi được cache mặc định:
+> `npm_config_cache=/tmp/npm-cache npm install` rồi xoá `/tmp/npm-cache` sau khi cài.
+
+## Lệnh
+
+| Lệnh | Việc |
+|---|---|
+| `npm run dev` | chạy dev (Turbopack) |
+| `npm run build` | build production — cũng là cổng chất lượng |
+| `npm run typecheck` | `next typegen` + `tsc --noEmit` |
+| `npm run lint` | eslint |
+| `npm test` | vitest |
+| `npm run db:generate` / `db:migrate` / `db:studio` | drizzle-kit (SQLite) |
+| `npm run db:seed` | seed dữ liệu demo tiếng Việt |
+| `npm run outbox` | chạy dispatcher thông báo |
+
+## Blueprint (đọc theo thứ tự)
+
+| Tài liệu | Nội dung |
+|---|---|
+| [`docs/00-tu-duy-san-pham.md`](docs/00-tu-duy-san-pham.md) | Tư duy thiết kế sản phẩm: định vị, persona, 3 bề mặt, Signal→Action→Proof, quy tắc "ít chữ" |
+| [`docs/01-tech-stack.md`](docs/01-tech-stack.md) | Tech stack + ADR + cấu trúc thư mục + 8 quy tắc portability DB + runbook Postgres |
+| [`docs/02-design-system.md`](docs/02-design-system.md) | Design token, typography tiếng Việt, component, keyboard, a11y |
+| [`docs/03-ia-va-phan-quyen.md`](docs/03-ia-va-phan-quyen.md) | Cây route, map màn hình PRD, mô hình phân quyền 2 tầng, guard |
+| [`docs/04-ai-native.md`](docs/04-ai-native.md) | AI gateway, hợp đồng generative UI, catalog tool, guardrails, chi phí |
+| [`docs/05-data-model.md`](docs/05-data-model.md) | ~24 bảng, quan hệ, index, bất biến nghiệp vụ |
+| [`docs/06-lo-trinh-va-nghiem-thu.md`](docs/06-lo-trinh-va-nghiem-thu.md) | Phase 0–8, migration PMS, DoD, acceptance criteria → test ID, câu hỏi mở |
+| [`AGENTS.md`](AGENTS.md) | Luật bắt buộc cho coding agent |
+
+## Stack
+
+```
+Next.js 16.3.5 · React 19.3.0 · TypeScript 5 · Tailwind 4.3.3 · shadcn/ui 4.21 · lucide-react
+Drizzle 0.45.2 + better-sqlite3 13  (→ Postgres sau, xem docs/01 §8)
+better-auth 1.7.5 (organization + admin + emailOTP)
+AI SDK 7.0.105 + @ai-sdk/deepseek 3.0.47 (generative UI bằng tool-calling)
+```
+
+## Trạng thái
+
+| Phase | Nội dung | Trạng thái |
+|---|---|---|
+| P0 | Nền tảng: Next 16, token, shadcn, pin version | ✅ xong |
+| P1 | Design system + app shell + ⌘K + light/dark | ✅ xong |
+| P2 | Drizzle schema + migration + seed + better-auth + RBAC | ⏳ tiếp theo |
+| P3 | Today · Projects · File review · Approvals · Handover | ⏳ |
+| P4 | Onboarding hub | ⏳ |
+| P5 | AI gateway + generative UI + 6 tính năng AI | ⏳ |
+| P6 | Growth + Retaining (Brand Home) | ⏳ |
+| P7 | Outbox/notification + n8n + dashboards | ⏳ |
+| P8 | Hardening + a11y + runbook Postgres | ⏳ |
+
+### Ghi chú khi review P1
+
+Điều hướng đổi theo vai trò. Chưa nối better-auth, nên để xem giao diện khách hàng:
+
+```js
+// trong DevTools console
+document.cookie = "bc-viewer=client_owner"; location.reload();   // chủ doanh nghiệp khách hàng
+document.cookie = "bc-viewer=client_member"; location.reload();  // nhân viên khách hàng
+document.cookie = "bc-viewer=pm"; location.reload();             // PM Sao Kim (mặc định)
+```
+
+Cơ chế tạm này nằm duy nhất trong `src/server/auth/viewer.ts` và sẽ bị xoá ở P2.
