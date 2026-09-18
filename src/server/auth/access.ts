@@ -17,6 +17,32 @@ export type RoleRef =
   | { kind: "staff"; role: StaffRole }
   | { kind: "client"; role: ClientOrgRole };
 
+/** Người gọi đã xác thực. Sống ở module thuần để service/test dùng không cần Next. */
+export type AuthContext =
+  | { kind: "staff"; userId: string; name: string; email: string; role: StaffRole }
+  | {
+      kind: "client";
+      userId: string;
+      name: string;
+      email: string;
+      role: ClientOrgRole;
+      organizationId: string;
+    };
+
+export class ForbiddenError extends Error {
+  constructor(message = "Không có quyền thực hiện thao tác này") {
+    super(message);
+    this.name = "ForbiddenError";
+  }
+}
+
+export class UnauthenticatedError extends Error {
+  constructor(message = "Cần đăng nhập") {
+    super(message);
+    this.name = "UnauthenticatedError";
+  }
+}
+
 export type ProjectAccessLevel = "read" | "write" | "approve";
 
 const LEVEL_RANK: Record<ProjectAccessLevel, number> = { read: 1, write: 2, approve: 3 };

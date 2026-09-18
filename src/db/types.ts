@@ -21,6 +21,10 @@ export type MilestoneStatus = "pending" | "in_progress" | "done" | "overdue";
 
 export type TaskStatus = "todo" | "doing" | "review" | "done";
 
+export type FileKind = "design" | "document" | "image" | "video" | "other";
+
+export type FileVisibility = "internal" | "client";
+
 export type VersionStatus = "draft" | "in_review" | "changes_requested" | "approved";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "changes_requested";
