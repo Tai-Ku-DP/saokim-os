@@ -15,6 +15,7 @@ import {
 } from "@/db/sqlite/schema";
 import type { AuthContext } from "@/server/auth/access";
 import { listPendingApprovalsForUser } from "./files";
+import { countPendingDocuments } from "./onboarding";
 
 /**
  * Bề mặt HÔM NAY (docs/00 §3–§4): hàng đợi hành động, tối đa 5 việc.
@@ -244,26 +245,13 @@ export async function getTodaySummary(ctx: AuthContext): Promise<TodaySummary> {
 
   const pendingApprovals = await listPendingApprovalsForUser(ctx, 50);
 
-  const pendingDocuments =
-    ctx.kind === "client"
-      ? await db
-          .select({ id: checklistItem.id })
-          .from(checklistItem)
-          .innerJoin(onboardingChecklist, eq(checklistItem.checklistId, onboardingChecklist.id))
-          .innerJoin(project, eq(onboardingChecklist.projectId, project.id))
-          .where(
-            and(
-              inArray(checklistItem.status, ["todo", "rejected"]),
-              eq(checklistItem.required, true),
-              eq(project.organizationId, ctx.organizationId),
-            ),
-          )
-      : [];
+  // Dùng chung logic với Onboarding Hub để tránh hai định nghĩa "tài liệu còn thiếu".
+  const pendingDocuments = await countPendingDocuments(ctx);
 
   return {
     activeProjects: activeProjects.length,
     pendingApprovals: pendingApprovals.length,
     overdueTasks: overdueTasks.length,
-    pendingDocuments: pendingDocuments.length,
+    pendingDocuments,
   };
 }

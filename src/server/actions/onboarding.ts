@@ -1,0 +1,179 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { requireSession } from "@/server/auth/guard";
+import { toActionResult, type ActionResult } from "@/server/services/errors";
+import {
+  completeChecklist,
+  createChecklistForProject,
+  createDocumentRequest,
+  markDocumentReceived,
+  reviewChecklistItem,
+  saveBrandBrief,
+  submitChecklistItem,
+} from "@/server/services/onboarding";
+
+/** Server Action cho Onboarding Hub — mỗi action tự xác thực rồi gọi service. */
+
+export async function createChecklistAction(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const ctx = await requireSession();
+    const projectId = String(formData.get("projectId") ?? "");
+    if (!projectId) return { ok: false, error: "Thiếu dự án" };
+
+    await createChecklistForProject(ctx, projectId);
+    revalidatePath("/onboarding");
+    return { ok: true, message: "Đã sinh checklist theo loại dự án" };
+  } catch (error) {
+    return toActionResult(error);
+  }
+}
+
+export async function submitChecklistItemAction(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const ctx = await requireSession();
+    const itemId = String(formData.get("itemId") ?? "");
+    if (!itemId) return { ok: false, error: "Thiếu mục cần nộp" };
+
+    await submitChecklistItem(ctx, itemId);
+    revalidatePath("/onboarding");
+    revalidatePath("/today");
+    return { ok: true, message: "Đã nộp mục này" };
+  } catch (error) {
+    return toActionResult(error);
+  }
+}
+
+export async function reviewChecklistItemAction(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const ctx = await requireSession();
+    const parsed = z
+      .object({
+        itemId: z.string().min(1),
+        decision: z.enum(["approved", "rejected"]),
+        note: z.string().max(300).optional(),
+      })
+      .safeParse({
+        itemId: formData.get("itemId"),
+        decision: formData.get("decision"),
+        note: String(formData.get("note") ?? "").trim() || undefined,
+      });
+
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Dữ liệu không hợp lệ" };
+    }
+
+    await reviewChecklistItem(ctx, parsed.data);
+    revalidatePath("/onboarding");
+    return {
+      ok: true,
+      message: parsed.data.decision === "approved" ? "Đã duyệt mục" : "Đã yêu cầu bổ sung",
+    };
+  } catch (error) {
+    return toActionResult(error);
+  }
+}
+
+export async function completeChecklistAction(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const ctx = await requireSession();
+    const checklistId = String(formData.get("checklistId") ?? "");
+    if (!checklistId) return { ok: false, error: "Thiếu checklist" };
+
+    await completeChecklist(ctx, {
+      checklistId,
+      override: formData.get("override") === "on",
+      reason: String(formData.get("reason") ?? "").trim() || undefined,
+    });
+
+    revalidatePath("/onboarding");
+    revalidatePath("/today");
+    return { ok: true, message: "Onboarding đã hoàn tất" };
+  } catch (error) {
+    return toActionResult(error);
+  }
+}
+
+export async function saveBrandBriefAction(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const ctx = await requireSession();
+    const projectId = String(formData.get("projectId") ?? "");
+    if (!projectId) return { ok: false, error: "Thiếu dự án" };
+
+    const fields = {
+      brand: text(formData, "brand"),
+      products: text(formData, "products"),
+      audience: text(formData, "audience"),
+      competitors: text(formData, "competitors"),
+      tone: text(formData, "tone"),
+      goals: text(formData, "goals"),
+    };
+
+    if (!fields.brand) return { ok: false, error: "Cần tên thương hiệu" };
+
+    await saveBrandBrief(ctx, { projectId, fields, submit: formData.get("submit") === "1" });
+    revalidatePath("/onboarding");
+    return {
+      ok: true,
+      message: formData.get("submit") === "1" ? "Đã gửi brand brief" : "Đã lưu nháp",
+    };
+  } catch (error) {
+    return toActionResult(error);
+  }
+}
+
+export async function createDocumentRequestAction(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const ctx = await requireSession();
+    const projectId = String(formData.get("projectId") ?? "");
+    const label = String(formData.get("label") ?? "").trim();
+    if (!projectId || !label) return { ok: false, error: "Thiếu thông tin" };
+
+    await createDocumentRequest(ctx, { projectId, label });
+    revalidatePath("/onboarding");
+    return { ok: true, message: "Đã yêu cầu tài liệu" };
+  } catch (error) {
+    return toActionResult(error);
+  }
+}
+
+export async function markDocumentReceivedAction(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const ctx = await requireSession();
+    const documentId = String(formData.get("documentId") ?? "");
+    if (!documentId) return { ok: false, error: "Thiếu tài liệu" };
+
+    await markDocumentReceived(ctx, { documentId });
+    revalidatePath("/onboarding");
+    return { ok: true, message: "Đã đánh dấu đã nhận" };
+  } catch (error) {
+    return toActionResult(error);
+  }
+}
+
+function text(formData: FormData, key: string): string | undefined {
+  const value = String(formData.get(key) ?? "").trim();
+  return value.length > 0 ? value : undefined;
+}
