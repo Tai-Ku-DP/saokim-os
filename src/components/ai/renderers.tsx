@@ -261,6 +261,117 @@ export function ConfirmCard({
   );
 }
 
+type RoadmapData = {
+  healthScore: number | null;
+  stages: { key: string; title: string; state: string; serviceNames: string[] }[];
+};
+
+const STAGE_LABEL: Record<string, string> = {
+  done: "Đã xong",
+  current: "Đang làm",
+  next: "Tiếp theo",
+};
+
+export function RoadmapCard({
+  roadmap,
+  recommendations,
+}: {
+  roadmap: RoadmapData;
+  recommendations: { id: string; serviceName: string | null; serviceDescription: string | null }[];
+}) {
+  return (
+    <div className="card overflow-hidden">
+      <div className="border-b border-line px-3 py-2">
+        <p className="text-[12px] font-medium text-ink">Lộ trình phát triển</p>
+        {roadmap.healthScore !== null ? (
+          <p className="tnum text-[11px] text-ink-3">Điểm sức khỏe thương hiệu {roadmap.healthScore}/100</p>
+        ) : null}
+      </div>
+      <ol>
+        {roadmap.stages.map((stage) => (
+          <li key={stage.key} className="border-b border-line px-3 py-2 last:border-b-0">
+            <span className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink">{stage.title}</span>
+              <Badge variant="outline" className="shrink-0 border-line font-normal text-ink-3">
+                {STAGE_LABEL[stage.state] ?? stage.state}
+              </Badge>
+            </span>
+            {stage.serviceNames.length > 0 ? (
+              <span className="mt-1 block text-[11px] text-ink-3">{stage.serviceNames.join(" · ")}</span>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+      {recommendations.length > 0 ? (
+        <div className="border-t border-line bg-surface-2 px-3 py-2">
+          <p className="label-xs mb-1">Dịch vụ đề xuất</p>
+          <ul className="grid gap-1">
+            {recommendations.map((item) => (
+              <li key={item.id} className="text-[11.5px] text-ink-2">
+                {item.serviceName ?? "Dịch vụ"}
+                {item.serviceDescription ? (
+                  <span className="text-ink-3"> · {item.serviceDescription}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+type ApprovalSummary = {
+  projectId: string;
+  fileName: string;
+  versionNumber: number;
+  note: string | null;
+  uploadedByName: string | null;
+  requestedByName: string | null;
+  openFeedbackCount: number;
+  openFeedback: string[];
+};
+
+export function ApprovalSummaryCard({ summary }: { summary: ApprovalSummary }) {
+  return (
+    <div className="card overflow-hidden">
+      <div className="flex items-center justify-between border-b border-line px-3 py-2">
+        <span className="truncate text-[12px] font-medium text-ink">
+          {summary.fileName} <span className="tnum text-ink-3">v{summary.versionNumber}</span>
+        </span>
+        {summary.openFeedbackCount > 0 ? (
+          <span className="tnum shrink-0 text-[11px] text-warning">
+            {summary.openFeedbackCount} góp ý mở
+          </span>
+        ) : (
+          <span className="shrink-0 text-[11px] text-success">Không còn góp ý mở</span>
+        )}
+      </div>
+      <div className="px-3 py-2">
+        <p className="text-[12px] text-ink-2">{summary.note ?? "Không có ghi chú phiên bản"}</p>
+        <p className="mt-1 text-[11px] text-ink-3">
+          {summary.uploadedByName ? `${summary.uploadedByName} tải lên` : ""}
+          {summary.requestedByName ? ` · ${summary.requestedByName} gửi duyệt` : ""}
+        </p>
+        {summary.openFeedback.length > 0 ? (
+          <ul className="mt-2 grid gap-1">
+            {summary.openFeedback.map((text, index) => (
+              <li key={index} className="text-[11.5px] text-ink-3">
+                • {text}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+      <div className="border-t border-line px-3 py-2">
+        <Button asChild size="xs">
+          <Link href={`/projects/${summary.projectId}/approvals`}>Mở màn duyệt</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function CardNote({ text }: { text: string }) {
   return <p className="rounded-md border border-dashed border-line px-3 py-2 text-[12px] text-ink-3">{text}</p>;
 }

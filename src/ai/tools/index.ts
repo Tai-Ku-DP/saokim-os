@@ -3,7 +3,9 @@ import { z } from "zod";
 import type { AuthContext } from "@/server/auth/access";
 import { getFeedbackDigest, getRisks } from "@/server/services/intelligence";
 import { getTodayActions } from "@/server/services/today";
-import { listProjectApprovals, listProjectFiles } from "@/server/services/files";
+import { listProjectApprovals, listProjectFiles, getFileDetail } from "@/server/services/files";
+import { buildRoadmap, listOpenRecommendations } from "@/server/services/retaining";
+import { defaultOrganizationFor } from "@/server/services/clients";
 import { listProjects } from "@/server/services/projects";
 import { allowedWriteTools, isWriteTool } from "../guardrails";
 
@@ -19,6 +21,8 @@ export const READ_TOOL_NAMES = [
   "summarizeFeedback",
   "showRisks",
   "showApprovals",
+  "showGrowthRoadmap",
+  "summarizeApproval",
 ] as const;
 
 export const WRITE_TOOL_NAMES = [
@@ -127,6 +131,76 @@ export function buildReadTools(ctx: AuthContext) {
             versionNumber: a.versionNumber,
             requestedByName: a.requestedByName,
           })),
+        };
+      },
+    }),
+
+    showGrowthRoadmap: tool({
+      description:
+        "Lấy lộ trình phát triển thương hiệu theo giai đoạn và các dịch vụ đang được đề xuất",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const organizationId =
+          ctx.kind === "client" ? ctx.organizationId : await defaultOrganizationFor(ctx);
+        if (!organizationId) return { found: false as const };
+
+        const [roadmap, recommendations] = await Promise.all([
+          buildRoadmap(ctx, organizationId),
+          listOpenRecommendations(ctx, organizationId),
+        ]);
+
+        return {
+          found: true as const,
+          roadmap: {
+            healthScore: roadmap.healthScore,
+            stages: roadmap.stages.map((stage) => ({
+              key: stage.key,
+              title: stage.title,
+              state: stage.state,
+              serviceNames: stage.serviceNames,
+            })),
+          },
+          recommendations: recommendations.slice(0, 5).map((item) => ({
+            id: item.id,
+            serviceName: item.serviceName,
+            serviceDescription: item.serviceDescription,
+          })),
+        };
+      },
+    }),
+
+    summarizeApproval: tool({
+      description:
+        "Tóm tắt một phiên bản đang chờ duyệt: có gì thay đổi, còn bao nhiêu phản hồi chưa xử lý",
+      inputSchema: z.object({
+        projectId: z.string().describe("ID dự án"),
+      }),
+      execute: async ({ projectId }) => {
+        const pending = await listProjectApprovals(ctx, projectId, true);
+        const first = pending[0];
+
+        if (!first) return { found: false as const };
+
+        // Lấy ngữ cảnh của đúng phiên bản đang chờ: đổi gì, còn góp ý nào.
+        const detail = await getFileDetail(ctx, first.fileId);
+        const version = detail?.versions.find((v) => v.id === first.versionId) ?? null;
+        const openFeedback = (detail?.feedback ?? []).filter(
+          (f) => f.versionId === first.versionId && f.status === "open",
+        );
+
+        return {
+          found: true as const,
+          summary: {
+            projectId,
+            approvalId: first.id,
+            fileName: first.fileName,
+            versionNumber: first.versionNumber,
+            note: version?.note ?? null,
+            uploadedByName: version?.uploadedByName ?? null,
+            requestedByName: first.requestedByName,
+            openFeedbackCount: openFeedback.length,
+            openFeedback: openFeedback.slice(0, 5).map((f) => f.body),
+          },
         };
       },
     }),

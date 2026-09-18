@@ -4,6 +4,7 @@ import { ChevronRight, Sparkles } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ActionListCard,
+  ApprovalSummaryCard,
   ApprovalsCard,
   CardNote,
   ConfirmCard,
@@ -11,6 +12,7 @@ import {
   FilesCard,
   ProjectsCard,
   RiskListCard,
+  RoadmapCard,
 } from "@/components/ai/renderers";
 import { RENDERED_TOOLS } from "@/ai/renderers-registry";
 import { useAiWrite } from "@/components/ai/use-ai-write";
@@ -72,6 +74,21 @@ export function ToolRenderer({ part }: { part: ToolPart }) {
     }
     case "listFiles":
       return <FilesCard files={(output.files as never) ?? []} />;
+    case "showGrowthRoadmap":
+      return output.found ? (
+        <RoadmapCard
+          roadmap={output.roadmap as never}
+          recommendations={(output.recommendations as never) ?? []}
+        />
+      ) : (
+        <CardNote text="Chưa có lộ trình cho khách hàng này." />
+      );
+    case "summarizeApproval":
+      return output.found ? (
+        <ApprovalSummaryCard summary={output.summary as never} />
+      ) : (
+        <CardNote text="Không có phiên bản nào đang chờ duyệt." />
+      );
     case "createServiceRequest":
     case "createDesignRequest":
     case "requestDocument":

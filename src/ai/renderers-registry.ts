@@ -11,6 +11,8 @@ export const RENDERED_TOOLS: Record<string, string> = {
   summarizeFeedback: "Phản hồi theo phiên bản",
   showRisks: "Điểm cần chú ý",
   showApprovals: "Yêu cầu duyệt",
+  showGrowthRoadmap: "Lộ trình phát triển",
+  summarizeApproval: "Tóm tắt phiên bản chờ duyệt",
   listFiles: "Tệp",
   createServiceRequest: "Yêu cầu dịch vụ",
   createDesignRequest: "Yêu cầu thiết kế",

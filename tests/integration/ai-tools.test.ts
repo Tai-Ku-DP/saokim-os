@@ -2,13 +2,17 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  approval,
+  feedback,
   fileAsset,
   fileVersion,
+  growthRecommendation,
   member,
   notificationOutbox,
   organization,
   project,
   projectMember,
+  servicePackage,
   serviceRequest,
   user,
 } from "@/db/sqlite/schema";
@@ -37,9 +41,9 @@ const clientA: AuthContext = {
 
 async function reset() {
   for (const table of [
-    "notification_outbox", "service_request", "opportunity", "feedback",
-    "file_version", "file_asset", "project_member", "project", "member",
-    "organization", "user",
+    "notification_outbox", "service_request", "opportunity", "growth_recommendation",
+    "service_package", "approval", "feedback", "file_version", "file_asset",
+    "project_member", "project", "member", "organization", "user",
   ]) {
     await db.run(sql.raw(`delete from "${table}"`));
   }
@@ -84,8 +88,54 @@ async function reset() {
     fileId: "ai_file_a",
     versionNumber: 1,
     storageKey: "seed/logo/v1",
+    note: "Tinh chỉnh tỷ lệ ngôi sao",
     status: "in_review",
     createdAt: new Date(),
+  });
+
+  await db.insert(approval).values({
+    id: "ai_approval_a",
+    versionId: "ai_ver_a",
+    projectId: "ai_project_a",
+    approverId: "ai_owner_a",
+    requestedBy: "ai_pm",
+    status: "pending",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  await db.insert(feedback).values({
+    id: "ai_fb_open",
+    fileId: "ai_file_a",
+    versionId: "ai_ver_a",
+    authorId: "ai_owner_a",
+    authorSide: "client",
+    body: "Kiểm tra khoảng cách an toàn khi in",
+    status: "open",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  await db.insert(servicePackage).values({
+    id: "ai_pkg_guideline",
+    name: "Brand guideline",
+    category: "Brand",
+    description: "Bộ quy chuẩn thương hiệu",
+    active: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  await db.insert(growthRecommendation).values({
+    id: "ai_rec_1",
+    organizationId: ORG_A,
+    projectId: "ai_project_a",
+    trigger: { rule: "after_brand_identity" },
+    serviceId: "ai_pkg_guideline",
+    priority: 2,
+    status: "new",
+    createdAt: new Date(),
+    updatedAt: new Date(),
   });
 }
 
@@ -152,6 +202,54 @@ describe("tool đọc trả dữ liệu thật, đã scope", () => {
     await expect(
       toolOf(tools, "listFiles").execute!({ projectId: "ai_project_b" } as never),
     ).rejects.toBeInstanceOf(Error);
+  });
+});
+
+describe("tính năng AI: lộ trình tăng trưởng và tóm tắt duyệt", () => {
+  beforeEach(reset);
+
+  it("showGrowthRoadmap trả lộ trình + dịch vụ đề xuất của đúng công ty", async () => {
+    const tools = buildTools(clientA) as unknown as Record<string, unknown>;
+    const result = (await toolOf(tools, "showGrowthRoadmap").execute!(undefined as never)) as {
+      found: boolean;
+      roadmap: { stages: { key: string; state: string }[] };
+      recommendations: { serviceName: string | null }[];
+    };
+
+    expect(result.found).toBe(true);
+    expect(result.roadmap.stages.length).toBe(3);
+    expect(result.recommendations[0]?.serviceName).toBe("Brand guideline");
+  });
+
+  it("summarizeApproval tóm tắt đúng phiên bản đang chờ, kèm góp ý mở", async () => {
+    const tools = buildTools(pm) as unknown as Record<string, unknown>;
+    const result = (await toolOf(tools, "summarizeApproval").execute!({
+      projectId: "ai_project_a",
+    } as never)) as {
+      found: boolean;
+      summary: {
+        fileName: string;
+        versionNumber: number;
+        note: string | null;
+        openFeedbackCount: number;
+      };
+    };
+
+    expect(result.found).toBe(true);
+    expect(result.summary.fileName).toBe("Logo A");
+    expect(result.summary.versionNumber).toBe(1);
+    expect(result.summary.note).toContain("ngôi sao");
+    expect(result.summary.openFeedbackCount).toBe(1);
+  });
+
+  it("summarizeApproval báo không có khi không còn phiên bản chờ", async () => {
+    await db.update(approval).set({ status: "approved" });
+    const tools = buildTools(pm) as unknown as Record<string, unknown>;
+    const result = (await toolOf(tools, "summarizeApproval").execute!({
+      projectId: "ai_project_a",
+    } as never)) as { found: boolean };
+
+    expect(result.found).toBe(false);
   });
 });
 
