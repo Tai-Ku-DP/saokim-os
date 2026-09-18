@@ -31,8 +31,17 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         workspaceName={viewer.organizationName ?? "Sao Kim Branding"}
       />
       <SidebarInset className="min-w-0 bg-bg">
+        {/* Bỏ qua điều hướng: chuẩn a11y, chỉ hiện khi focus bằng Tab */}
+        <a
+          href="#noi-dung"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-surface focus:px-3 focus:py-1.5 focus:text-[12.5px] focus:text-ink focus:shadow-2"
+        >
+          Bỏ qua điều hướng
+        </a>
         <Topbar viewer={viewer} aiCanWrite={aiCanWrite} aiDemo={aiDemo} unreadCount={unread} />
-        <main className="min-w-0 flex-1">{children}</main>
+        <main id="noi-dung" className="min-w-0 flex-1">
+          {children}
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );

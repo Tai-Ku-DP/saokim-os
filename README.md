@@ -30,7 +30,9 @@ npm run dev                    # http://localhost:3000
 | `npm test` | vitest |
 | `npm run db:generate` / `db:migrate` / `db:studio` | drizzle-kit (SQLite) |
 | `npm run db:seed` | seed dữ liệu demo tiếng Việt |
-| `npm run outbox` | chạy dispatcher thông báo |
+| `npm run outbox` | chạy dispatcher thông báo (thêm `-- --watch` để chạy liên tục) |
+| `npm run pg:dry-run` | đếm số dòng mỗi bảng để chuẩn bị migrate Postgres |
+| `npm run pg:copy` | copy dữ liệu sang Postgres (cần `DATABASE_URL` + driver `pg`) |
 
 ## Blueprint (đọc theo thứ tự)
 
@@ -66,7 +68,7 @@ AI SDK 7.0.105 + @ai-sdk/deepseek 3.0.47 (generative UI bằng tool-calling)
 | P5 | AI gateway + generative UI + tool catalog + guardrails + cost cap | ✅ xong |
 | P6 | Growth + Retaining (lộ trình, đề xuất, Brand Home, yêu cầu dịch vụ) | ✅ xong |
 | P7 | Outbox worker + notification + n8n + Inbox/Clients/Reports | ✅ xong |
-| P8 | Hardening + a11y + docs + artifacts Postgres | ⏳ tiếp theo |
+| P8 | Hardening + a11y + docs + artifacts Postgres | ✅ xong |
 
 ### Tài khoản demo (sau `npm run db:seed`)
 

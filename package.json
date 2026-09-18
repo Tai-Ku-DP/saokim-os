@@ -17,7 +17,9 @@
     "db:seed": "tsx --conditions=react-server scripts/seed.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "outbox": "tsx --conditions=react-server scripts/outbox-worker.ts"
+    "outbox": "tsx --conditions=react-server scripts/outbox-worker.ts",
+    "pg:dry-run": "tsx --conditions=react-server scripts/copy-sqlite-to-pg.ts",
+    "pg:copy": "tsx --conditions=react-server scripts/copy-sqlite-to-pg.ts --copy"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "3.0.47",

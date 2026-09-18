@@ -47,7 +47,7 @@
 | Thành phần | Version | Ghi chú |
 |---|---|---|
 | Vitest | **5.0.1** | unit: domain, permission, repository (SQLite in-memory **chạy migration thật**) |
-| tsx | **4.23.13** | chạy script TS ngoài Next (`scripts/seed.ts`, `scripts/outbox-worker.ts`) |
+| tsx | **4.23.13** | chạy script TS ngoài Next. **Phải dùng `tsx --conditions=react-server`** vì script import module có `server-only` (package này ném lỗi nếu không ở điều kiện react-server) |
 | server-only | 0.0.1 | chặn import module server vào client |
 | Playwright | 1.63.0 *(Phase 3)* | dùng `channel: "chrome"` để **không tải browser** (tiết kiệm ~400MB đĩa) |
 
@@ -224,10 +224,25 @@ npm run db:generate && npm run db:migrate
 
 ## 8. Runbook đổi sang Postgres (mục tiêu: 1 PR, 1 buổi chiều)
 
-1. Viết `src/db/pg/{client,schema,relations,repository}.ts` — mirror schema sqlite **từng cột một** theo 8 quy tắc §5.
-2. `npm run db:generate` với `drizzle.pg.config.ts` → commit `drizzle/pg/*` → `migrate` lên một nhánh Neon/Supabase trống.
-3. `scripts/copy-sqlite-to-pg.ts`: đọc bằng repo sqlite, ghi bằng repo pg, batch 500–2000 dòng, một transaction mỗi batch, thứ tự FK. ID giữ nguyên vì là UUID sinh ở app.
-4. Chạy bộ integration test với `DB_DRIVER=pg` trên môi trường preview.
-5. Freeze ghi → copy → đếm số dòng từng bảng → đổi `DB_DRIVER=pg` → giữ file SQLite + bản `VACUUM INTO` làm rollback.
+**Đã có sẵn trong repo:**
+- `scripts/copy-sqlite-to-pg.ts` — thứ tự bảng an toàn với FK, batch 1000, `on conflict do nothing`
+- `npm run pg:dry-run` — đếm số dòng mỗi bảng từ SQLite (**không cần Postgres**), dùng để đối chiếu trước/sau
+- `npm run pg:copy` — copy thật (cần `DATABASE_URL` + `npm install pg @types/pg`)
+
+```
+1. Viết src/db/pg/{client,schema,relations,repository}.ts — mirror schema sqlite TỪNG CỘT
+   theo 8 quy tắc §5. (Chưa viết sẵn vì đây là bước ~1 ngày; viết lúc migrate.)
+2. Thêm drizzle.pg.config.ts (dialect "postgresql", schema ./src/db/pg/schema.ts,
+   out ./drizzle/pg) → npx drizzle-kit generate --config=drizzle.pg.config.ts
+   → commit drizzle/pg/* → migrate lên một nhánh Neon/Supabase trống.
+3. npm run pg:dry-run         # ghi lại số dòng nguồn
+4. DATABASE_URL=... npm run pg:copy
+5. npm run pg:dry-run và đối chiếu: mọi bảng phải khớp số dòng.
+6. Đổi DB_DRIVER=pg trong production; giữ file SQLite + bản `VACUUM INTO` làm rollback.
+```
+
+> Đã kiểm chứng ở P8: `npm run pg:dry-run` chạy trên dữ liệu seed và in đúng số dòng từng
+> bảng (tổng 145 dòng) theo thứ tự FK — tức là bước 3/5 dùng được ngay, phần còn lại chỉ
+> vướng việc phải có một Postgres thật.
 
 Sau đó xoá `db/sqlite` chỉ khi đã chạy production ổn định ≥ 1 sprint.
