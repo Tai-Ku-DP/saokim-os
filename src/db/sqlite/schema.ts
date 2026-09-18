@@ -41,6 +41,10 @@ const updatedAt = () =>
 const deletedAt = () => integer("deleted_at", { mode: "timestamp_ms" });
 const ts = (name: string) => integer(name, { mode: "timestamp_ms" });
 const bool = (name: string) => integer(name, { mode: "boolean" });
+const projectRef = () =>
+  text("project_id")
+    .notNull()
+    .references(() => project.id, { onDelete: "cascade" });
 const orgRef = () =>
   text("organization_id")
     .notNull()
@@ -168,8 +172,8 @@ export const checklistItem = sqliteTable(
     completedAt: ts("completed_at"),
     orderIndex: integer("order_index").notNull().default(0),
     note: text("note"),
-    /** Tệp khách đã nộp cho mục này (AC-ONB-002). */
-    fileId: text("file_id").references(() => fileAsset.id, { onDelete: "set null" }),
+    /** Nội dung khách trả lời cho mục này (ô nhập khi mở mục ra). */
+    answer: text("answer"),
     submittedAt: ts("submitted_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -221,13 +225,51 @@ export const documentRequest = sqliteTable(
     status: text("status", { enum: ["pending", "received", "waived"] })
       .notNull()
       .default("pending"),
-    fileId: text("file_id").references(() => fileAsset.id, { onDelete: "set null" }),
+    /** Nội dung/ghi chú khách nhập kèm tài liệu. */
+    answer: text("answer"),
     requestedBy: text("requested_by").references(() => user.id, { onDelete: "set null" }),
     receivedAt: ts("received_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [index("document_request_project_idx").on(t.projectId, t.status)],
+);
+
+/**
+ * Đính kèm cho onboarding (AC-ONB-002): một mục có THỂ có nhiều tệp.
+ *
+ * Vì sao một bảng với hai cột FK (thay vì bảng polymorphic `owner_type/owner_id`):
+ * giữ được khoá ngoại thật cho cả hai chủ thể, mà UI vẫn dùng chung một component.
+ * Đúng một trong hai cột được set (ràng buộc ở tầng service).
+ *
+ * Xoá = **gỡ mềm**: set `detached_at` + `detached_by`; tệp vẫn nằm trong dự án và
+ * `audit_log` ghi lại ai gỡ (không xoá dữ liệu).
+ */
+export const attachment = sqliteTable(
+  "attachment",
+  {
+    id: pk(),
+    projectId: projectRef(),
+    checklistItemId: text("checklist_item_id").references(() => checklistItem.id, {
+      onDelete: "cascade",
+    }),
+    documentRequestId: text("document_request_id").references(() => documentRequest.id, {
+      onDelete: "cascade",
+    }),
+    fileId: text("file_id")
+      .notNull()
+      .references(() => fileAsset.id, { onDelete: "cascade" }),
+    versionId: text("version_id").references(() => fileVersion.id, { onDelete: "set null" }),
+    attachedBy: text("attached_by").references(() => user.id, { onDelete: "set null" }),
+    detachedAt: ts("detached_at"),
+    detachedBy: text("detached_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("attachment_item_idx").on(t.checklistItemId, t.detachedAt),
+    index("attachment_doc_idx").on(t.documentRequestId, t.detachedAt),
+    index("attachment_project_idx").on(t.projectId),
+  ],
 );
 
 /* ---------------------------------------------------------------------- delivery */

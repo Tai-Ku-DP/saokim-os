@@ -54,9 +54,10 @@ Mọi bảng tenant-scoped đều có organization_id (FK → organization.id) v
 | Bảng | Cột | Map |
 |---|---|---|
 | `onboarding_checklist` | id, project_id (FK), template_key, status (`draft`\|`in_progress`\|`completed`), completion_rate, completed_at | OnboardingChecklist |
-| `checklist_item` | id, checklist_id, key, label, required (bool), status (`todo`\|`submitted`\|`approved`\|`rejected`), owner_side, due_at, completed_at, order_index, note | items |
+| `checklist_item` | id, checklist_id, key, label, required (bool), status (`todo`\|`submitted`\|`approved`\|`rejected`), owner_side, due_at, completed_at, order_index, note (PM yêu cầu bổ sung), **answer** (nội dung khách nhập), submitted_at | items |
 | `brand_brief` | id, project_id, organization_id, **fields** (JSON: brand, products, audience, competitors, tone, goals), attachments (JSON: file id[]), submitted_by, submitted_at, status | BrandBrief |
-| `document_request` | id, project_id, label, required (bool), status (`pending`\|`received`\|`waived`), file_id, requested_by, received_at | DocumentRequest (ONB-004) |
+| `document_request` | id, project_id, label, required (bool), status (`pending`\|`received`\|`waived`), **answer**, requested_by, received_at | DocumentRequest (ONB-004) |
+| `attachment` | id, project_id, checklist_item_id (nullable), document_request_id (nullable), file_id, version_id, attached_by, detached_at, detached_by, created_at | Đính kèm nhiều tệp cho onboarding (AC-ONB-002). Đúng một trong hai cột chủ thể được set. **Gỡ = xoá mềm** (`detached_at`), tệp vẫn nằm trong dự án |
 
 ### Delivery
 | Bảng | Cột | Map |
@@ -160,6 +161,8 @@ user               (email)
 | 8 | Ghi outbox nằm **cùng transaction** với hành động nghiệp vụ | §15 |
 | 9 | `handover_item` chỉ thêm được khi `handover_package.status != 'released'` | §9 |
 | 10 | Tiền luôn là integer cents; không có phép tính float trên tiền | §01 |
+| 11 | Gỡ tệp đính kèm là **xoá mềm**: chỉ set `detached_at/detached_by`, không xoá tệp — vẫn tải được từ dự án và có `audit_log` | AC-ONB-002 |
+| 12 | Mục onboarding đã `approved` thì **không** đính kèm thêm, không gỡ tệp, không nộp lại | AC-ONB-005 |
 
 ---
 

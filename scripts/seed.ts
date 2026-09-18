@@ -293,8 +293,19 @@ async function main() {
 
   await db.insert(schema.documentRequest).values([
     { id: "seed_doc_1", projectId: P2, label: "Nội dung giới thiệu dự án", required: true, status: "pending", requestedBy: "seed_user_pm", createdAt: daysAgo(9), updatedAt: daysAgo(9) },
-    { id: "seed_doc_2", projectId: P2, label: "Thông tin hosting & domain", required: true, status: "received", fileId: "seed_file_wireframe", requestedBy: "seed_user_pm", receivedAt: daysAgo(5), createdAt: daysAgo(9), updatedAt: daysAgo(5) },
+    { id: "seed_doc_2", projectId: P2, label: "Thông tin hosting & domain", required: true, status: "received", answer: "Đã gửi thông tin qua email, đính kèm file tổng hợp.", requestedBy: "seed_user_pm", receivedAt: daysAgo(5), createdAt: daysAgo(9), updatedAt: daysAgo(5) },
   ]);
+
+  // Tài liệu đã nhận thì có tệp đính kèm (bảng attachment).
+  await db.insert(schema.attachment).values({
+    id: "seed_attach_1",
+    projectId: P2,
+    documentRequestId: "seed_doc_2",
+    fileId: "seed_file_wireframe",
+    versionId: "seed_ver_wf_1",
+    attachedBy: "seed_user_client_member",
+    createdAt: daysAgo(5),
+  });
 
   /* ------------------------------------------------------- onboarding dự án 2 */
   await db.insert(schema.onboardingChecklist).values({

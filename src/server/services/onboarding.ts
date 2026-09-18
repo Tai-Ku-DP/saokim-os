@@ -18,7 +18,7 @@ import { can } from "@/server/auth/access";
 import { DomainError } from "./errors";
 import { enqueueInTx } from "./outbox";
 import { addVersion, createFile } from "./files";
-import { fileAsset, fileVersion } from "@/db/sqlite/schema";
+import { attachment, fileAsset } from "@/db/sqlite/schema";
 
 /**
  * Onboarding Hub (PRD §8). Bất biến quan trọng nhất:
@@ -90,6 +90,18 @@ export const ONBOARDING_TEMPLATES: Record<ProjectType, TemplateItem[]> = {
   ],
 };
 
+export type AttachmentRow = {
+  /** id bản ghi attachment (dùng để gỡ) */
+  id: string;
+  fileId: string;
+  versionId: string | null;
+  fileName: string;
+  sizeBytes: number | null;
+  mime: string | null;
+  attachedByName: string | null;
+  createdAt: Date;
+};
+
 export type ChecklistView = {
   id: string;
   projectId: string;
@@ -109,22 +121,19 @@ export type ChecklistView = {
     note: string | null;
     dueAt: Date | null;
     orderIndex: number;
-    /** Tệp khách đã nộp (AC-ONB-002) */
-    fileId: string | null;
-    fileVersionId: string | null;
-    fileLabel: string | null;
-    fileVersion: number | null;
+    /** Nội dung khách nhập cho mục này */
+    answer: string | null;
     submittedAt: Date | null;
+    /** Tệp đính kèm còn hiệu lực (AC-ONB-002) */
+    attachments: AttachmentRow[];
   }[];
   documents: {
     id: string;
     label: string;
     required: boolean;
     status: "pending" | "received" | "waived";
-    fileId: string | null;
-    fileVersionId: string | null;
-    fileLabel: string | null;
-    fileVersion: number | null;
+    answer: string | null;
+    attachments: AttachmentRow[];
   }[];
   canComplete: boolean;
 };
@@ -263,7 +272,7 @@ async function buildChecklistView(
       note: checklistItem.note,
       dueAt: checklistItem.dueAt,
       orderIndex: checklistItem.orderIndex,
-      fileId: checklistItem.fileId,
+      answer: checklistItem.answer,
       submittedAt: checklistItem.submittedAt,
     })
     .from(checklistItem)
@@ -276,17 +285,16 @@ async function buildChecklistView(
       label: documentRequest.label,
       required: documentRequest.required,
       status: documentRequest.status,
-      fileId: documentRequest.fileId,
+      answer: documentRequest.answer,
     })
     .from(documentRequest)
     .where(eq(documentRequest.projectId, checklist.projectId));
 
-  // Tra tên tệp + phiên bản mới nhất cho mọi tệp đã nộp (item + document request).
-  const fileIds = [
-    ...items.map((item) => item.fileId),
-    ...documents.map((doc) => doc.fileId),
-  ].filter((id): id is string => Boolean(id));
-  const fileInfo = await lookupFiles(fileIds);
+  // Nạp tệp đính kèm còn hiệu lực của cả item lẫn document request (2 truy vấn).
+  const [itemAttachments, docAttachments] = await Promise.all([
+    loadAttachments(items.map((item) => item.id), "checklist_item"),
+    loadAttachments(documents.map((doc) => doc.id), "document_request"),
+  ]);
 
   const requiredItems = items.filter((item) => item.required);
   const approvedRequired = requiredItems.filter((item) => item.status === "approved").length;
@@ -305,15 +313,11 @@ async function buildChecklistView(
     approvedRequired,
     items: items.map((item) => ({
       ...item,
-      fileLabel: item.fileId ? (fileInfo.get(item.fileId)?.name ?? null) : null,
-      fileVersion: item.fileId ? (fileInfo.get(item.fileId)?.versionNumber ?? null) : null,
-      fileVersionId: item.fileId ? (fileInfo.get(item.fileId)?.versionId ?? null) : null,
+      attachments: itemAttachments.get(item.id) ?? [],
     })),
     documents: documents.map((doc) => ({
       ...doc,
-      fileLabel: doc.fileId ? (fileInfo.get(doc.fileId)?.name ?? null) : null,
-      fileVersion: doc.fileId ? (fileInfo.get(doc.fileId)?.versionNumber ?? null) : null,
-      fileVersionId: doc.fileId ? (fileInfo.get(doc.fileId)?.versionId ?? null) : null,
+      attachments: docAttachments.get(doc.id) ?? [],
     })),
     canComplete: approvedRequired === requiredItems.length,
   };
@@ -323,7 +327,7 @@ async function buildChecklistView(
 export async function submitChecklistItem(
   ctx: AuthContext,
   itemId: string,
-  fileId?: string,
+  answer?: string | null,
 ): Promise<void> {
   const item = await loadItem(itemId);
   const access = await assertProjectAccess(ctx, item.projectId, "write");
@@ -338,7 +342,7 @@ export async function submitChecklistItem(
         status: "submitted",
         completedAt: new Date(),
         submittedAt: new Date(),
-        ...(fileId ? { fileId } : {}),
+        ...(answer !== undefined ? { answer } : {}),
         updatedAt: new Date(),
       })
       .where(eq(checklistItem.id, itemId))
@@ -566,7 +570,7 @@ export async function createDocumentRequest(
 
 export async function markDocumentReceived(
   ctx: AuthContext,
-  input: { documentId: string; fileId?: string },
+  input: { documentId: string; answer?: string | null },
 ): Promise<void> {
   const rows = await db
     .select({ projectId: documentRequest.projectId })
@@ -581,7 +585,7 @@ export async function markDocumentReceived(
     .update(documentRequest)
     .set({
       status: "received",
-      fileId: input.fileId ?? null,
+      ...(input.answer !== undefined ? { answer: input.answer } : {}),
       receivedAt: new Date(),
       updatedAt: new Date(),
     })
@@ -606,32 +610,54 @@ export async function countPendingDocuments(ctx: AuthContext): Promise<number> {
   return Number(rows[0]?.total ?? 0);
 }
 
-/** Tra tên tệp + số phiên bản mới nhất cho danh sách file id. */
-async function lookupFiles(fileIds: string[]) {
-  const map = new Map<
-    string,
-    { name: string; versionNumber: number | null; versionId: string | null }
-  >();
-  if (fileIds.length === 0) return map;
+/**
+ * Nạp tệp đính kèm còn hiệu lực cho một loại chủ thể (checklist_item | document_request).
+ * Chỉ lấy bản ghi chưa gỡ (`detached_at IS NULL`) — tệp đã gỡ vẫn nằm trong dự án.
+ */
+async function loadAttachments(
+  ownerIds: string[],
+  kind: "checklist_item" | "document_request",
+): Promise<Map<string, AttachmentRow[]>> {
+  const map = new Map<string, AttachmentRow[]>();
+  if (ownerIds.length === 0) return map;
+
+  const ownerColumn = kind === "checklist_item" ? attachment.checklistItemId : attachment.documentRequestId;
 
   const rows = await db
     .select({
-      id: fileAsset.id,
-      name: fileAsset.name,
-      currentVersionId: fileAsset.currentVersionId,
-      versionNumber: fileVersion.versionNumber,
+      id: attachment.id,
+      ownerId: ownerColumn,
+      fileId: attachment.fileId,
+      versionId: attachment.versionId,
+      fileName: fileAsset.name,
+      sizeBytes: fileAsset.sizeBytes,
+      mime: fileAsset.mime,
+      attachedBy: attachment.attachedBy,
+      attachedByName: user.name,
+      createdAt: attachment.createdAt,
     })
-    .from(fileAsset)
-    .leftJoin(fileVersion, eq(fileAsset.currentVersionId, fileVersion.id))
-    .where(inArray(fileAsset.id, fileIds));
+    .from(attachment)
+    .innerJoin(fileAsset, eq(attachment.fileId, fileAsset.id))
+    .leftJoin(user, eq(attachment.attachedBy, user.id))
+    .where(and(inArray(ownerColumn, ownerIds), isNull(attachment.detachedAt)))
+    .orderBy(asc(attachment.createdAt));
 
   for (const row of rows) {
-    map.set(row.id, {
-      name: row.name,
-      versionNumber: row.versionNumber ?? null,
-      versionId: row.currentVersionId ?? null,
+    if (!row.ownerId) continue;
+    const list = map.get(row.ownerId) ?? [];
+    list.push({
+      id: row.id,
+      fileId: row.fileId,
+      versionId: row.versionId,
+      fileName: row.fileName,
+      sizeBytes: row.sizeBytes,
+      mime: row.mime,
+      attachedByName: row.attachedByName,
+      createdAt: row.createdAt,
     });
+    map.set(row.ownerId, list);
   }
+
   return map;
 }
 
@@ -646,86 +672,159 @@ function kindFromName(fileName: string): "design" | "document" | "image" | "vide
 }
 
 /**
- * Khách nộp tài liệu cho một mục checklist (AC-ONB-002).
- * Tệp được lưu qua StoragePort và tạo phiên bản như mọi tệp khác — nên **có lịch sử**,
- * không ghi đè, và PM xem/tải được ngay trong dự án.
+ * Đính kèm NHIỀU tệp cho một mục onboarding hoặc một "tài liệu cần cung cấp"
+ * (AC-ONB-002). Tệp được lưu qua StoragePort và **xuất hiện trong dự án** như mọi tệp
+ * khác, nhưng onboarding chỉ cần danh sách tệp — không cần mô hình phiên bản.
  */
-export async function submitChecklistItemWithFile(
+export async function attachFiles(
   ctx: AuthContext,
-  input: { itemId: string; fileName: string; note?: string; data: Uint8Array },
-): Promise<{ fileId: string; versionNumber: number }> {
-  const item = await loadItem(input.itemId);
-  await assertProjectAccess(ctx, item.projectId, "write");
-
-  if (item.status === "approved") {
-    throw new DomainError("INVALID_INPUT", "Mục này đã được duyệt nên không nộp lại");
+  input: {
+    kind: "checklist_item" | "document_request";
+    ownerId: string;
+    files: { fileName: string; data: Uint8Array }[];
+  },
+): Promise<{ attached: number }> {
+  if (input.files.length === 0) {
+    throw new DomainError("INVALID_INPUT", "Chưa chọn tệp nào");
   }
 
-  // Nộp lại sau khi bị yêu cầu bổ sung → thêm phiên bản mới cho chính tệp đó.
-  let fileId = item.fileId;
-  if (!fileId) {
-    fileId = await createFile(ctx, {
-      projectId: item.projectId,
-      name: item.label,
-      kind: kindFromName(input.fileName),
+  const owner =
+    input.kind === "checklist_item"
+      ? await loadItem(input.ownerId)
+      : await loadDocument(input.ownerId);
+
+  const access = await assertProjectAccess(ctx, owner.projectId, "write");
+  if (owner.status === "approved") {
+    throw new DomainError("INVALID_INPUT", "Mục đã được duyệt nên không đính kèm thêm");
+  }
+
+  let attached = 0;
+
+  for (const file of input.files) {
+    // Mỗi tệp là một file_asset riêng (không ghi đè tệp trước) → trong dự án thấy đủ.
+    const fileId = await createFile(ctx, {
+      projectId: owner.projectId,
+      name: file.fileName,
+      kind: kindFromName(file.fileName),
       visibility: "client",
     });
+
+    const version = await addVersion(ctx, {
+      fileId,
+      fileName: file.fileName,
+      note: `Đính kèm cho: ${owner.label}`,
+      data: file.data,
+    });
+
+    db.transaction((tx) => {
+      tx.insert(attachment)
+        .values({
+          projectId: owner.projectId,
+          checklistItemId: input.kind === "checklist_item" ? input.ownerId : null,
+          documentRequestId: input.kind === "document_request" ? input.ownerId : null,
+          fileId,
+          versionId: version.versionId,
+          attachedBy: ctx.userId,
+        })
+        .run();
+
+      tx.insert(auditLog)
+        .values({
+          organizationId: access.organizationId,
+          actorId: ctx.userId,
+          action: "attachment.added",
+          entity: input.kind,
+          entityId: input.ownerId,
+          after: { fileId, fileName: file.fileName },
+        })
+        .run();
+    });
+
+    attached += 1;
   }
 
-  const version = await addVersion(ctx, {
-    fileId,
-    fileName: input.fileName,
-    note: input.note ?? `Nộp cho mục: ${item.label}`,
-    data: input.data,
-  });
-
-  await submitChecklistItem(ctx, input.itemId, fileId);
-
-  return { fileId, versionNumber: version.versionNumber };
+  return { attached };
 }
 
-/** Khách nộp tệp cho một "tài liệu cần cung cấp". */
-export async function uploadDocumentFile(
+/**
+ * Gỡ một tệp khỏi mục — **xoá mềm**: chỉ set `detached_at`, tệp vẫn nằm trong dự án.
+ * Ai gỡ được: người đã đính kèm, hoặc nhân sự có quyền duyệt onboarding.
+ */
+export async function detachAttachment(
   ctx: AuthContext,
-  input: { documentId: string; fileName: string; data: Uint8Array },
-): Promise<{ fileId: string; versionNumber: number }> {
+  attachmentId: string,
+): Promise<void> {
+  const rows = await db
+    .select({
+      id: attachment.id,
+      projectId: attachment.projectId,
+      attachedBy: attachment.attachedBy,
+      detachedAt: attachment.detachedAt,
+      checklistItemId: attachment.checklistItemId,
+      documentRequestId: attachment.documentRequestId,
+      fileName: fileAsset.name,
+    })
+    .from(attachment)
+    .innerJoin(fileAsset, eq(attachment.fileId, fileAsset.id))
+    .where(eq(attachment.id, attachmentId))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) throw new DomainError("INVALID_INPUT", "Không tìm thấy tệp đính kèm");
+  if (row.detachedAt) return; // đã gỡ rồi — không lỗi, chỉ bỏ qua
+
+  const access = await assertProjectAccess(ctx, row.projectId, "write");
+
+  const isOwner = row.attachedBy === ctx.userId;
+  const canReview = can(ctx, { onboarding: ["review"] });
+  if (!isOwner && !canReview) {
+    throw new DomainError("INVALID_INPUT", "Bạn chỉ gỡ được tệp do mình đính kèm");
+  }
+
+  // Không gỡ khi mục đã được duyệt (giữ bất biến "đã duyệt là chốt").
+  const ownerStatus = row.checklistItemId
+    ? (await loadItem(row.checklistItemId)).status
+    : row.documentRequestId
+      ? (await loadDocument(row.documentRequestId)).status
+      : null;
+  if (ownerStatus === "approved") {
+    throw new DomainError("INVALID_INPUT", "Mục đã được duyệt nên không gỡ tệp");
+  }
+
+  db.transaction((tx) => {
+    tx.update(attachment)
+      .set({ detachedAt: new Date(), detachedBy: ctx.userId })
+      .where(eq(attachment.id, attachmentId))
+      .run();
+
+    tx.insert(auditLog)
+      .values({
+        organizationId: access.organizationId,
+        actorId: ctx.userId,
+        action: "attachment.detached",
+        entity: row.checklistItemId ? "checklist_item" : "document_request",
+        entityId: row.checklistItemId ?? row.documentRequestId,
+        before: { attachmentId, fileName: row.fileName },
+      })
+      .run();
+  });
+}
+
+async function loadDocument(documentId: string) {
   const rows = await db
     .select({
       id: documentRequest.id,
       projectId: documentRequest.projectId,
       label: documentRequest.label,
-      fileId: documentRequest.fileId,
       status: documentRequest.status,
     })
     .from(documentRequest)
-    .where(eq(documentRequest.id, input.documentId))
+    .where(eq(documentRequest.id, documentId))
     .limit(1);
 
   const doc = rows[0];
   if (!doc) throw new DomainError("INVALID_INPUT", "Không tìm thấy yêu cầu tài liệu");
-
-  await assertProjectAccess(ctx, doc.projectId, "write");
-
-  let fileId = doc.fileId;
-  if (!fileId) {
-    fileId = await createFile(ctx, {
-      projectId: doc.projectId,
-      name: doc.label,
-      kind: kindFromName(input.fileName),
-      visibility: "client",
-    });
-  }
-
-  const version = await addVersion(ctx, {
-    fileId,
-    fileName: input.fileName,
-    note: `Tài liệu: ${doc.label}`,
-    data: input.data,
-  });
-
-  await markDocumentReceived(ctx, { documentId: input.documentId, fileId });
-
-  return { fileId, versionNumber: version.versionNumber };
+  return doc;
 }
 
 async function loadItem(itemId: string) {
@@ -735,7 +834,6 @@ async function loadItem(itemId: string) {
       checklistId: checklistItem.checklistId,
       status: checklistItem.status,
       ownerSide: checklistItem.ownerSide,
-      fileId: checklistItem.fileId,
       label: checklistItem.label,
       projectId: onboardingChecklist.projectId,
     })

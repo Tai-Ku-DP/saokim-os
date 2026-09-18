@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  attachment,
   auditLog,
   checklistItem,
   documentRequest,
@@ -26,10 +27,10 @@ import {
   saveBrandBrief,
   getBrandBrief,
   submitChecklistItem,
-  submitChecklistItemWithFile,
-  uploadDocumentFile,
+  attachFiles,
+  detachAttachment,
+  markDocumentReceived,
 } from "@/server/services/onboarding";
-import { listProjectFiles } from "@/server/services/files";
 
 /**
  * Acceptance criteria Onboarding (PRD §8.5):
@@ -188,125 +189,133 @@ describe("AC-ONB-002/003/004 — nộp mục, thông báo, tiến độ", () => 
   });
 });
 
-describe("AC-ONB-002 — NỘP TỆP thật cho từng mục (không chỉ đổi trạng thái)", () => {
+describe("AC-ONB-002 — đính kèm nhiều tệp + ô nội dung trả lời", () => {
   beforeEach(reset);
 
-  it("nộp tệp tạo tệp + phiên bản, gắn vào mục và PM tải được", async () => {
+  const enc = (s: string) => new TextEncoder().encode(s);
+
+  it("đính kèm nhiều tệp: tạo tệp + phiên bản + bản ghi attachment + audit", async () => {
     const checklistId = await createChecklistForProject(pm, PROJECT);
     const view = await getChecklistView(pm, checklistId);
     const item = view!.items.find((i) => i.ownerSide === "client" && i.required)!;
 
-    const result = await submitChecklistItemWithFile(clientOwner, {
-      itemId: item.id,
-      fileName: "ho-so-doanh-nghiep.pdf",
-      note: "Bản đầy đủ",
-      data: new TextEncoder().encode("%PDF-1.4 nội dung giả"),
+    const result = await attachFiles(clientOwner, {
+      kind: "checklist_item",
+      ownerId: item.id,
+      files: [
+        { fileName: "ho-so.pdf", data: enc("%PDF-1.4 a") },
+        { fileName: "anh-mat-bang.png", data: enc("PNG") },
+      ],
     });
 
-    // 1) mục đã gắn tệp + trạng thái đã nộp + có mốc thời gian nộp
+    expect(result.attached).toBe(2);
+    expect(await db.select().from(fileAsset)).toHaveLength(2);
+    expect(await db.select().from(fileVersion)).toHaveLength(2);
+    expect(await db.select().from(attachment)).toHaveLength(2);
+
+    const audits = await db.select().from(auditLog);
+    expect(audits.filter((a) => a.action === "attachment.added")).toHaveLength(2);
+  });
+
+  it("view trả danh sách tệp kèm tên + dung lượng + versionId để tải", async () => {
+    const checklistId = await createChecklistForProject(pm, PROJECT);
+    const view = await getChecklistView(pm, checklistId);
+    const item = view!.items.find((i) => i.ownerSide === "client")!;
+
+    await attachFiles(clientOwner, {
+      kind: "checklist_item",
+      ownerId: item.id,
+      files: [{ fileName: "bang-mau.pdf", data: enc("%PDF-1.4 mau") }],
+    });
+
+    const after = await getChecklistView(pm, checklistId);
+    const got = after!.items.find((i) => i.id === item.id)!;
+    expect(got.attachments).toHaveLength(1);
+    expect(got.attachments[0]?.fileName).toBe("bang-mau.pdf");
+    expect(got.attachments[0]?.sizeBytes).toBeGreaterThan(0);
+    expect(got.attachments[0]?.versionId).toBeTruthy();
+  });
+
+  it("nộp mục lưu NỘI DUNG trả lời của khách", async () => {
+    const checklistId = await createChecklistForProject(pm, PROJECT);
+    const view = await getChecklistView(pm, checklistId);
+    const item = view!.items.find((i) => i.ownerSide === "client")!;
+
+    await submitChecklistItem(clientOwner, item.id, "Đã gửi qua email nội bộ ngày 18/09");
+
     const row = await db.select().from(checklistItem).where(eq(checklistItem.id, item.id));
     expect(row[0]?.status).toBe("submitted");
-    expect(row[0]?.fileId).toBe(result.fileId);
+    expect(row[0]?.answer).toContain("18/09");
     expect(row[0]?.submittedAt).toBeInstanceOf(Date);
-
-    // 2) tệp và phiên bản thật sự được tạo
-    const files = await db.select().from(fileAsset).where(eq(fileAsset.id, result.fileId));
-    expect(files).toHaveLength(1);
-    expect(files[0]?.name).toBe(item.label);
-    expect(files[0]?.visibility).toBe("client");
-
-    const versions = await db.select().from(fileVersion).where(eq(fileVersion.fileId, result.fileId));
-    expect(versions).toHaveLength(1);
-    expect(versions[0]?.versionNumber).toBe(1);
-    expect(versions[0]?.status).toBe("in_review");
-
-    // 3) tệp xuất hiện trong danh sách tệp của dự án (PM làm việc được với nó)
-    const projectFiles = await listProjectFiles(pm, PROJECT);
-    expect(projectFiles.some((f) => f.id === result.fileId)).toBe(true);
-
-    // 4) view trả thông tin tệp để UI hiện link tải
-    const after = await getChecklistView(pm, checklistId);
-    const viewItem = after!.items.find((i) => i.id === item.id)!;
-    expect(viewItem.fileLabel).toBe(item.label);
-    expect(viewItem.fileVersion).toBe(1);
-    expect(viewItem.fileVersionId).toBe(versions[0]?.id);
   });
 
-  it("nộp lại sau khi bị yêu cầu bổ sung thì tạo PHIÊN BẢN MỚI, không tạo tệp trùng", async () => {
+  it("gỡ tệp là XOÁ MỀM: mất khỏi mục nhưng tệp vẫn nằm trong dự án + có audit", async () => {
     const checklistId = await createChecklistForProject(pm, PROJECT);
     const view = await getChecklistView(pm, checklistId);
     const item = view!.items.find((i) => i.ownerSide === "client")!;
 
-    const first = await submitChecklistItemWithFile(clientOwner, {
-      itemId: item.id,
-      fileName: "ban-1.pdf",
-      data: new TextEncoder().encode("v1"),
+    await attachFiles(clientOwner, {
+      kind: "checklist_item",
+      ownerId: item.id,
+      files: [{ fileName: "nhap.pdf", data: enc("x") }],
     });
 
-    await reviewChecklistItem(pm, { itemId: item.id, decision: "rejected", note: "Thiếu phụ lục" });
+    const attached = (await getChecklistView(pm, checklistId))!.items.find((i) => i.id === item.id)!;
+    const attachmentId = attached.attachments[0]!.id;
+    await detachAttachment(clientOwner, attachmentId);
 
-    const second = await submitChecklistItemWithFile(clientOwner, {
-      itemId: item.id,
-      fileName: "ban-2.pdf",
-      data: new TextEncoder().encode("v2"),
-    });
+    // 1) mục không còn tệp
+    const after = (await getChecklistView(pm, checklistId))!.items.find((i) => i.id === item.id)!;
+    expect(after.attachments).toHaveLength(0);
 
-    // cùng một tệp, thêm phiên bản — không sinh tệp thứ hai
-    expect(second.fileId).toBe(first.fileId);
-    expect(second.versionNumber).toBe(2);
-    expect(await db.select().from(fileAsset).where(eq(fileAsset.name, item.label))).toHaveLength(1);
+    // 2) bản ghi vẫn còn (xoá mềm), tệp vẫn trong dự án
+    const rows = await db.select().from(attachment);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.detachedAt).toBeInstanceOf(Date);
+    expect(rows[0]?.detachedBy).toBe("u_owner");
+    expect(await db.select().from(fileAsset)).toHaveLength(1);
 
-    const versions = await db.select().from(fileVersion).where(eq(fileVersion.fileId, first.fileId));
-    expect(versions.map((v) => v.versionNumber).sort()).toEqual([1, 2]);
+    // 3) có vết audit
+    const audits = await db.select().from(auditLog);
+    expect(audits.some((a) => a.action === "attachment.detached")).toBe(true);
   });
 
-  it("mục đã được duyệt thì không nộp lại được", async () => {
+  it("không gỡ được tệp khi mục đã được duyệt", async () => {
     const checklistId = await createChecklistForProject(pm, PROJECT);
     const view = await getChecklistView(pm, checklistId);
     const item = view!.items.find((i) => i.ownerSide === "client")!;
 
-    await submitChecklistItemWithFile(clientOwner, {
-      itemId: item.id,
-      fileName: "x.pdf",
-      data: new TextEncoder().encode("x"),
+    await attachFiles(clientOwner, {
+      kind: "checklist_item",
+      ownerId: item.id,
+      files: [{ fileName: "final.pdf", data: enc("x") }],
     });
+    await submitChecklistItem(clientOwner, item.id, null);
     await reviewChecklistItem(pm, { itemId: item.id, decision: "approved" });
 
+    const attached = (await getChecklistView(pm, checklistId))!.items.find((i) => i.id === item.id)!;
+
+    // Không gỡ
     await expect(
-      submitChecklistItemWithFile(clientOwner, {
-        itemId: item.id,
-        fileName: "y.pdf",
-        data: new TextEncoder().encode("y"),
+      detachAttachment(clientOwner, attached.attachments[0]!.id),
+    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+
+    // Không đính kèm thêm
+    await expect(
+      attachFiles(clientOwner, {
+        kind: "checklist_item",
+        ownerId: item.id,
+        files: [{ fileName: "them.pdf", data: enc("x") }],
       }),
     ).rejects.toMatchObject({ code: "INVALID_INPUT" });
-  });
 
-  it("nộp tệp cho 'tài liệu cần cung cấp' chuyển trạng thái sang đã nhận", async () => {
-    const checklistId = await createChecklistForProject(pm, PROJECT);
-    await createDocumentRequest(pm, { projectId: PROJECT, label: "Sơ đồ tổ chức" });
-    const docs = await db.select().from(documentRequest);
-    const doc = docs.find((d) => d.label === "Sơ đồ tổ chức")!;
-    expect(doc.status).toBe("pending");
-    expect(doc.fileId).toBeNull();
-
-    const result = await uploadDocumentFile(clientOwner, {
-      documentId: doc.id,
-      fileName: "so-do-to-chuc.pdf",
-      data: new TextEncoder().encode("pdf"),
+    // Không nộp lại
+    await expect(submitChecklistItem(clientOwner, item.id, "sửa")).rejects.toMatchObject({
+      code: "INVALID_INPUT",
     });
-
-    const after = await db.select().from(documentRequest).where(eq(documentRequest.id, doc.id));
-    expect(after[0]?.status).toBe("received");
-    expect(after[0]?.fileId).toBe(result.fileId);
-    expect(after[0]?.receivedAt).toBeInstanceOf(Date);
-
-    const view = await getChecklistView(pm, checklistId);
-    const viewDoc = view!.documents.find((d) => d.id === doc.id)!;
-    expect(viewDoc.fileLabel).toBe("Sơ đồ tổ chức");
-    expect(viewDoc.fileVersionId).toBeTruthy();
   });
 
-  it("nhân sự không có quyền ghi cũng không nộp được (enforce ở service)", async () => {
+  it("người không có quyền trong dự án không đính kèm được", async () => {
     const checklistId = await createChecklistForProject(pm, PROJECT);
     const view = await getChecklistView(pm, checklistId);
     const item = view!.items.find((i) => i.ownerSide === "client")!;
@@ -321,12 +330,35 @@ describe("AC-ONB-002 — NỘP TỆP thật cho từng mục (không chỉ đổ
     };
 
     await expect(
-      submitChecklistItemWithFile(outsider, {
-        itemId: item.id,
-        fileName: "hack.pdf",
-        data: new TextEncoder().encode("x"),
+      attachFiles(outsider, {
+        kind: "checklist_item",
+        ownerId: item.id,
+        files: [{ fileName: "hack.pdf", data: enc("x") }],
       }),
     ).rejects.toBeInstanceOf(Error);
+  });
+
+  it("tài liệu cần cung cấp: đính kèm tệp + nội dung rồi đánh dấu đã nhận", async () => {
+    const checklistId = await createChecklistForProject(pm, PROJECT);
+    await createDocumentRequest(pm, { projectId: PROJECT, label: "Sơ đồ tổ chức" });
+    const doc = (await db.select().from(documentRequest)).find((d) => d.label === "Sơ đồ tổ chức")!;
+    expect(doc.status).toBe("pending");
+
+    await attachFiles(clientOwner, {
+      kind: "document_request",
+      ownerId: doc.id,
+      files: [{ fileName: "so-do.pdf", data: enc("pdf") }],
+    });
+    await markDocumentReceived(clientOwner, { documentId: doc.id, answer: "Bản mới nhất" });
+
+    const after = (await db.select().from(documentRequest)).find((d) => d.id === doc.id)!;
+    expect(after.status).toBe("received");
+    expect(after.answer).toBe("Bản mới nhất");
+
+    const view = await getChecklistView(pm, checklistId);
+    const viewDoc = view!.documents.find((d) => d.id === doc.id)!;
+    expect(viewDoc.attachments).toHaveLength(1);
+    expect(viewDoc.attachments[0]?.fileName).toBe("so-do.pdf");
   });
 });
 

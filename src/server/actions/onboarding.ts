@@ -8,14 +8,14 @@ import {
   completeChecklist,
   createChecklistForProject,
   createDocumentRequest,
-  markDocumentReceived,
   reviewChecklistItem,
   saveBrandBrief,
+  attachFiles,
+  detachAttachment,
   submitChecklistItem,
-  submitChecklistItemWithFile,
-  uploadDocumentFile,
+  markDocumentReceived,
 } from "@/server/services/onboarding";
-import { readUpload } from "@/server/upload";
+import { MAX_UPLOAD_BYTES } from "@/server/upload";
 
 /** Server Action cho Onboarding Hub — mỗi action tự xác thực rồi gọi service. */
 
@@ -37,9 +37,8 @@ export async function createChecklistAction(
 }
 
 /**
- * Nộp một mục onboarding. Hai đường:
- *  - có tệp  → lưu tệp (StoragePort + phiên bản) rồi mới đánh dấu đã nộp (AC-ONB-002)
- *  - không tệp → chỉ đánh dấu đã nộp (dùng cho mục xác nhận, ví dụ "Xác nhận lịch kickoff")
+ * Nộp một mục onboarding: lưu nội dung trả lời (ô nhập) + chuyển trạng thái "đã nộp".
+ * Tệp đính kèm do action riêng (`attachFilesAction`) xử lý — nộp và đính kèm tách rời.
  */
 export async function submitChecklistItemAction(
   _prev: ActionResult,
@@ -50,27 +49,10 @@ export async function submitChecklistItemAction(
     const itemId = String(formData.get("itemId") ?? "");
     if (!itemId) return { ok: false, error: "Thiếu mục cần nộp" };
 
-    const hasFile = formData.get("file") instanceof File && (formData.get("file") as File).size > 0;
+    const answer = String(formData.get("answer") ?? "").trim();
 
-    if (hasFile) {
-      const upload = await readUpload(formData);
-      if (!upload.ok) return { ok: false, error: upload.error };
+    await submitChecklistItem(ctx, itemId, answer.length > 0 ? answer : null);
 
-      const note = String(formData.get("note") ?? "").trim() || undefined;
-      const result = await submitChecklistItemWithFile(ctx, {
-        itemId,
-        fileName: upload.fileName,
-        note,
-        data: upload.data,
-      });
-
-      revalidatePath("/onboarding");
-      revalidatePath("/today");
-      revalidatePath("/projects", "layout");
-      return { ok: true, message: `Đã nộp ${upload.fileName} (phiên bản ${result.versionNumber})` };
-    }
-
-    await submitChecklistItem(ctx, itemId);
     revalidatePath("/onboarding");
     revalidatePath("/today");
     return { ok: true, message: "Đã nộp mục này" };
@@ -79,29 +61,78 @@ export async function submitChecklistItemAction(
   }
 }
 
-/** Nộp tệp cho một "tài liệu cần cung cấp" — bắt buộc có tệp. */
-export async function uploadDocumentAction(
+/** Đính kèm một hoặc nhiều tệp cho mục checklist / tài liệu cần cung cấp. */
+export async function attachFilesAction(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const ctx = await requireSession();
+    const kind = formData.get("kind") === "document_request" ? "document_request" : "checklist_item";
+    const ownerId = String(formData.get("ownerId") ?? "");
+    if (!ownerId) return { ok: false, error: "Thiếu mục cần đính kèm" };
+
+    const uploads = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
+    if (uploads.length === 0) return { ok: false, error: "Chưa chọn tệp nào" };
+
+    const files = [];
+    for (const upload of uploads) {
+      if (upload.size > MAX_UPLOAD_BYTES) {
+        return { ok: false, error: `Tệp "${upload.name}" vượt 25MB` };
+      }
+      files.push({ fileName: upload.name, data: new Uint8Array(await upload.arrayBuffer()) });
+    }
+
+    const result = await attachFiles(ctx, { kind, ownerId, files });
+
+    revalidatePath("/onboarding");
+    revalidatePath("/projects", "layout");
+    return {
+      ok: true,
+      message: result.attached === 1 ? `Đã đính kèm ${files[0]!.fileName}` : `Đã đính kèm ${result.attached} tệp`,
+    };
+  } catch (error) {
+    return toActionResult(error);
+  }
+}
+
+/** Gỡ một tệp khỏi mục (xoá mềm — tệp vẫn nằm trong dự án, có ghi audit). */
+export async function detachAttachmentAction(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const ctx = await requireSession();
+    const attachmentId = String(formData.get("attachmentId") ?? "");
+    if (!attachmentId) return { ok: false, error: "Thiếu tệp cần gỡ" };
+
+    await detachAttachment(ctx, attachmentId);
+    revalidatePath("/onboarding");
+    return { ok: true, message: "Đã gỡ tệp khỏi mục" };
+  } catch (error) {
+    return toActionResult(error);
+  }
+}
+
+/** Nộp/đánh dấu đã nhận một tài liệu cần cung cấp, kèm nội dung trả lời. */
+export async function markDocumentReceivedAction(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
   try {
     const ctx = await requireSession();
     const documentId = String(formData.get("documentId") ?? "");
-    if (!documentId) return { ok: false, error: "Thiếu tài liệu cần nộp" };
+    if (!documentId) return { ok: false, error: "Thiếu tài liệu" };
 
-    const upload = await readUpload(formData);
-    if (!upload.ok) return { ok: false, error: upload.error };
-
-    const result = await uploadDocumentFile(ctx, {
+    const answer = String(formData.get("answer") ?? "").trim();
+    await markDocumentReceived(ctx, {
       documentId,
-      fileName: upload.fileName,
-      data: upload.data,
+      answer: answer.length > 0 ? answer : null,
     });
 
     revalidatePath("/onboarding");
     revalidatePath("/today");
-    revalidatePath("/projects", "layout");
-    return { ok: true, message: `Đã nộp ${upload.fileName} (phiên bản ${result.versionNumber})` };
+    return { ok: true, message: "Đã đánh dấu đã nhận" };
   } catch (error) {
     return toActionResult(error);
   }
@@ -207,23 +238,6 @@ export async function createDocumentRequestAction(
     await createDocumentRequest(ctx, { projectId, label });
     revalidatePath("/onboarding");
     return { ok: true, message: "Đã yêu cầu tài liệu" };
-  } catch (error) {
-    return toActionResult(error);
-  }
-}
-
-export async function markDocumentReceivedAction(
-  _prev: ActionResult,
-  formData: FormData,
-): Promise<ActionResult> {
-  try {
-    const ctx = await requireSession();
-    const documentId = String(formData.get("documentId") ?? "");
-    if (!documentId) return { ok: false, error: "Thiếu tài liệu" };
-
-    await markDocumentReceived(ctx, { documentId });
-    revalidatePath("/onboarding");
-    return { ok: true, message: "Đã đánh dấu đã nhận" };
   } catch (error) {
     return toActionResult(error);
   }

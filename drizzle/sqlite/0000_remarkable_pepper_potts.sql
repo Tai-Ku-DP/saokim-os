@@ -48,6 +48,29 @@ CREATE TABLE `approval` (
 --> statement-breakpoint
 CREATE INDEX `approval_approver_idx` ON `approval` (`approver_id`,`status`);--> statement-breakpoint
 CREATE INDEX `approval_project_idx` ON `approval` (`project_id`,`status`);--> statement-breakpoint
+CREATE TABLE `attachment` (
+	`id` text PRIMARY KEY NOT NULL,
+	`project_id` text NOT NULL,
+	`checklist_item_id` text,
+	`document_request_id` text,
+	`file_id` text NOT NULL,
+	`version_id` text,
+	`attached_by` text,
+	`detached_at` integer,
+	`detached_by` text,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`project_id`) REFERENCES `project`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`checklist_item_id`) REFERENCES `checklist_item`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`document_request_id`) REFERENCES `document_request`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`file_id`) REFERENCES `file_asset`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`version_id`) REFERENCES `file_version`(`id`) ON UPDATE no action ON DELETE set null,
+	FOREIGN KEY (`attached_by`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE set null,
+	FOREIGN KEY (`detached_by`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE set null
+);
+--> statement-breakpoint
+CREATE INDEX `attachment_item_idx` ON `attachment` (`checklist_item_id`,`detached_at`);--> statement-breakpoint
+CREATE INDEX `attachment_doc_idx` ON `attachment` (`document_request_id`,`detached_at`);--> statement-breakpoint
+CREATE INDEX `attachment_project_idx` ON `attachment` (`project_id`);--> statement-breakpoint
 CREATE TABLE `audit_log` (
 	`id` text PRIMARY KEY NOT NULL,
 	`organization_id` text NOT NULL,
@@ -148,6 +171,8 @@ CREATE TABLE `checklist_item` (
 	`completed_at` integer,
 	`order_index` integer DEFAULT 0 NOT NULL,
 	`note` text,
+	`answer` text,
+	`submitted_at` integer,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`checklist_id`) REFERENCES `onboarding_checklist`(`id`) ON UPDATE no action ON DELETE cascade
@@ -177,13 +202,12 @@ CREATE TABLE `document_request` (
 	`label` text NOT NULL,
 	`required` integer DEFAULT true NOT NULL,
 	`status` text DEFAULT 'pending' NOT NULL,
-	`file_id` text,
+	`answer` text,
 	`requested_by` text,
 	`received_at` integer,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`project_id`) REFERENCES `project`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`file_id`) REFERENCES `file_asset`(`id`) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (`requested_by`) REFERENCES `user`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint

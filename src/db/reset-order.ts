@@ -30,6 +30,7 @@ export const RESET_ORDER = [
   "meeting_note",
   "approval",
   "feedback",
+  "attachment",
   "checklist_item",
   "onboarding_checklist",
   "document_request",

@@ -6,18 +6,15 @@ import { EmptyState } from "@/components/shell/empty-state";
 import { StatusBadge } from "@/components/domain/status-badge";
 import {
   BrandBriefForm,
-  ChecklistItemActions,
+  ChecklistItemPanel,
   CompleteChecklist,
-  DocumentUploadForm,
-  SubmittedFileLink,
+  DocumentPanel,
 } from "@/components/domain/onboarding-forms";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { can } from "@/server/auth/access";
 import { requireSession } from "@/server/auth/guard";
 import { getBrandBrief, listOnboarding } from "@/server/services/onboarding";
 import { formatDate } from "@/lib/format";
-import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Onboarding" };
 
@@ -80,88 +77,46 @@ export default async function OnboardingPage() {
                 />
               </div>
 
-              <ul>
+              <div>
                 {checklist.items.map((item) => (
-                  <li
+                  <ChecklistItemPanel
                     key={item.id}
-                    className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5 last:border-b-0"
-                  >
-                    <span
-                      className={cn(
-                        "size-1.5 shrink-0 rounded-full",
-                        item.status === "approved"
-                          ? "bg-success"
-                          : item.status === "rejected"
-                            ? "bg-hot"
-                            : "bg-line-strong",
-                      )}
-                      aria-hidden
-                    />
-                    <span className="min-w-0 flex-1 truncate text-[13px] text-ink">
-                      {item.label}
-                      {item.required ? null : (
-                        <span className="ml-1.5 text-[11px] text-ink-3">không bắt buộc</span>
-                      )}
-                    </span>
-                    <Badge variant="secondary" className="font-normal">
-                      {item.ownerSide === "client" ? "Khách" : "Sao Kim"}
-                    </Badge>
-                    {item.dueAt ? (
-                      <span className="text-[11px] text-ink-3">{formatDate(item.dueAt)}</span>
-                    ) : null}
-                    <StatusBadge kind="checklist" value={item.status} />
-                    {isStaff ? (
-                      <ChecklistItemActions
-                        itemId={item.id}
-                        status={item.status}
-                        ownerSide={item.ownerSide}
-                        isStaff={canReview}
-                      />
-                    ) : canWrite && item.ownerSide === "client" ? (
-                      <ChecklistItemActions
-                        itemId={item.id}
-                        status={item.status}
-                        ownerSide={item.ownerSide}
-                        isStaff={false}
-                      />
-                    ) : null}
-                    {item.note ? (
-                      <p className="w-full text-[11px] text-warning">PM yêu cầu: {item.note}</p>
-                    ) : null}
-                    {item.fileLabel ? (
-                      <p className="w-full">
-                        <SubmittedFileLink
-                          label={item.fileLabel}
-                          version={item.fileVersion}
-                          versionId={item.fileVersionId}
-                        />
-                      </p>
-                    ) : null}
-                  </li>
+                    item={{
+                      id: item.id,
+                      label: item.label,
+                      required: item.required,
+                      ownerSide: item.ownerSide,
+                      status: item.status,
+                      note: item.note,
+                      answer: item.answer,
+                      dueAtLabel: item.dueAt ? formatDate(item.dueAt) : null,
+                      attachments: item.attachments,
+                    }}
+                    canSubmit={isStaff ? canReview : canWrite && item.ownerSide === "client"}
+                    canReview={isStaff && canReview}
+                    canAttach={isStaff ? canReview : canWrite && item.ownerSide === "client"}
+                    canDetachAny={isStaff && canReview}
+                  />
                 ))}
-              </ul>
+              </div>
 
               {checklist.documents.length > 0 ? (
-                <div className="border-t border-line bg-surface-2 px-4 py-2.5">
-                  <p className="label-xs mb-1.5">Tài liệu yêu cầu</p>
-                  <ul className="grid gap-1">
-                    {checklist.documents.map((doc) => (
-                      <li key={doc.id} className="flex flex-wrap items-center gap-2 text-[12px]">
-                        <span className="min-w-0 flex-1 truncate text-ink-2">{doc.label}</span>
-                        {doc.fileLabel ? (
-                          <SubmittedFileLink
-                            label={doc.fileLabel}
-                            version={doc.fileVersion}
-                            versionId={doc.fileVersionId}
-                          />
-                        ) : null}
-                        <StatusBadge kind="document" value={doc.status} />
-                        {doc.status === "pending" && canWrite ? (
-                          <DocumentUploadForm documentId={doc.id} />
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
+                <div className="border-t border-line bg-surface-2/30">
+                  <p className="label-xs px-4 pt-3">Tài liệu cần cung cấp</p>
+                  {checklist.documents.map((doc) => (
+                    <DocumentPanel
+                      key={doc.id}
+                      doc={{
+                        id: doc.id,
+                        label: doc.label,
+                        required: doc.required,
+                        status: doc.status,
+                        answer: doc.answer,
+                        attachments: doc.attachments,
+                      }}
+                      canWrite={isStaff ? canReview : canWrite}
+                    />
+                  ))}
                 </div>
               ) : null}
 

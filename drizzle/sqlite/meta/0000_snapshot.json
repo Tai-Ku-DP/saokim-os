@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "59006b4d-c348-4248-bc5a-eb8b6f080f91",
+  "id": "d182d945-7b3f-4a58-9c65-3fcd58058970",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "ai_feedback": {
@@ -373,6 +373,202 @@
           "tableTo": "user",
           "columnsFrom": [
             "approver_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "attachment": {
+      "name": "attachment",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "checklist_item_id": {
+          "name": "checklist_item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "document_request_id": {
+          "name": "document_request_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "file_id": {
+          "name": "file_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version_id": {
+          "name": "version_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "attached_by": {
+          "name": "attached_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "detached_at": {
+          "name": "detached_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "detached_by": {
+          "name": "detached_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "attachment_item_idx": {
+          "name": "attachment_item_idx",
+          "columns": [
+            "checklist_item_id",
+            "detached_at"
+          ],
+          "isUnique": false
+        },
+        "attachment_doc_idx": {
+          "name": "attachment_doc_idx",
+          "columns": [
+            "document_request_id",
+            "detached_at"
+          ],
+          "isUnique": false
+        },
+        "attachment_project_idx": {
+          "name": "attachment_project_idx",
+          "columns": [
+            "project_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "attachment_project_id_project_id_fk": {
+          "name": "attachment_project_id_project_id_fk",
+          "tableFrom": "attachment",
+          "tableTo": "project",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "attachment_checklist_item_id_checklist_item_id_fk": {
+          "name": "attachment_checklist_item_id_checklist_item_id_fk",
+          "tableFrom": "attachment",
+          "tableTo": "checklist_item",
+          "columnsFrom": [
+            "checklist_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "attachment_document_request_id_document_request_id_fk": {
+          "name": "attachment_document_request_id_document_request_id_fk",
+          "tableFrom": "attachment",
+          "tableTo": "document_request",
+          "columnsFrom": [
+            "document_request_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "attachment_file_id_file_asset_id_fk": {
+          "name": "attachment_file_id_file_asset_id_fk",
+          "tableFrom": "attachment",
+          "tableTo": "file_asset",
+          "columnsFrom": [
+            "file_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "attachment_version_id_file_version_id_fk": {
+          "name": "attachment_version_id_file_version_id_fk",
+          "tableFrom": "attachment",
+          "tableTo": "file_version",
+          "columnsFrom": [
+            "version_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "attachment_attached_by_user_id_fk": {
+          "name": "attachment_attached_by_user_id_fk",
+          "tableFrom": "attachment",
+          "tableTo": "user",
+          "columnsFrom": [
+            "attached_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "attachment_detached_by_user_id_fk": {
+          "name": "attachment_detached_by_user_id_fk",
+          "tableFrom": "attachment",
+          "tableTo": "user",
+          "columnsFrom": [
+            "detached_by"
           ],
           "columnsTo": [
             "id"
@@ -1106,6 +1302,20 @@
           "notNull": false,
           "autoincrement": false
         },
+        "answer": {
+          "name": "answer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "submitted_at": {
+          "name": "submitted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -1306,8 +1516,8 @@
           "autoincrement": false,
           "default": "'pending'"
         },
-        "file_id": {
-          "name": "file_id",
+        "answer": {
+          "name": "answer",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -1364,19 +1574,6 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "document_request_file_id_file_asset_id_fk": {
-          "name": "document_request_file_id_file_asset_id_fk",
-          "tableFrom": "document_request",
-          "tableTo": "file_asset",
-          "columnsFrom": [
-            "file_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "document_request_requested_by_user_id_fk": {

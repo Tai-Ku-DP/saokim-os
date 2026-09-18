@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { RESET_ORDER } from "@/db/reset-order";
 import {
   approval,
+  attachment,
   auditLog,
   checklistItem,
   documentRequest,
@@ -87,7 +88,6 @@ async function seedCrossReferences() {
   });
   await db.update(fileAsset).set({ currentVersionId: "v_reset" }).where(sql`${fileAsset.id} = 'f_reset'`);
 
-  // Cột `file_id` của checklist_item là FK được thêm bằng ALTER TABLE (không có ON DELETE).
   await db.insert(checklistItem).values({
     id: "ci_reset",
     checklistId: "chk_reset",
@@ -96,11 +96,22 @@ async function seedCrossReferences() {
     required: true,
     ownerSide: "client",
     status: "submitted",
-    fileId: "f_reset",
+    answer: "Nội dung khách nhập",
     submittedAt: new Date(),
     orderIndex: 1,
     createdAt: new Date(),
     updatedAt: new Date(),
+  });
+
+  // Bảng attachment trỏ tới cả checklist_item và file_asset → phải xoá TRƯỚC cả hai.
+  await db.insert(attachment).values({
+    id: "at_reset",
+    projectId: PROJECT,
+    checklistItemId: "ci_reset",
+    fileId: "f_reset",
+    versionId: "v_reset",
+    attachedBy: "u_reset",
+    createdAt: new Date(),
   });
 
   // Các bảng khác cũng tham chiếu tới file/project để thử thứ tự.
@@ -109,7 +120,6 @@ async function seedCrossReferences() {
     projectId: PROJECT,
     label: "Tài liệu",
     status: "received",
-    fileId: "f_reset",
     createdAt: new Date(),
     updatedAt: new Date(),
   });
@@ -162,8 +172,10 @@ describe("thứ tự reset dữ liệu (RESET_ORDER)", () => {
   it("dữ liệu tham chiếu chéo đã được dựng đúng (tiền đề của test)", async () => {
     const assets = await db.select().from(fileAsset);
     const items = await db.select().from(checklistItem);
+    const links = await db.select().from(attachment);
     expect(assets).toHaveLength(1);
-    expect(items[0]?.fileId).toBe("f_reset");
+    expect(items).toHaveLength(1);
+    expect(links[0]?.fileId).toBe("f_reset");
   });
 
   it("xoá theo RESET_ORDER không vi phạm khoá ngoại (foreign_keys = ON)", async () => {
@@ -184,12 +196,12 @@ describe("thứ tự reset dữ liệu (RESET_ORDER)", () => {
     expect(await db.select().from(organization)).toHaveLength(0);
   });
 
-  it("checklist_item phải đứng TRƯỚC file_asset trong danh sách", () => {
-    const checkItem = RESET_ORDER.indexOf("checklist_item");
-    const fileAssetIdx = RESET_ORDER.indexOf("file_asset");
-    expect(checkItem).toBeGreaterThanOrEqual(0);
-    expect(fileAssetIdx).toBeGreaterThanOrEqual(0);
-    expect(checkItem).toBeLessThan(fileAssetIdx);
+  it("attachment phải đứng TRƯỚC checklist_item, document_request và file_asset", () => {
+    const at = RESET_ORDER.indexOf("attachment");
+    expect(at).toBeGreaterThanOrEqual(0);
+    for (const parent of ["checklist_item", "document_request", "file_asset"] as const) {
+      expect(at, `attachment phải trước ${parent}`).toBeLessThan(RESET_ORDER.indexOf(parent));
+    }
   });
 
   it("mọi bảng đều xuất hiện đúng một lần", () => {

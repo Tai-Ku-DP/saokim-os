@@ -107,7 +107,7 @@ npm run dev
 |---|---|---|---|
 | B1 | `npm run typecheck` | Kết thúc bằng `✓ Types generated successfully`, **0 dòng `error TS`** | [ ] |
 | B2 | `npm run lint` | Không in ra dòng `error`/`warning` nào | [ ] |
-| B3 | `npm test` | `Test Files 12 passed (12)` · `Tests 113 passed (113)` | [ ] |
+| B3 | `npm test` | `Test Files 12 passed (12)` · `Tests 115 passed (115)` | [ ] |
 | B4 | `npm run build` | `✓ Compiled successfully` · danh sách route có **23 dòng** | [ ] |
 | B5 | `npm run pg:dry-run` | In bảng số dòng + `Tổng` (đối chiếu mốc A6) | [ ] |
 | B6 | `npm run outbox` | `Outbox: xử lý 1, gửi 1, lỗi 0` (lần đầu) — lần hai phải là `xử lý 0` | [ ] |
@@ -168,17 +168,20 @@ Vai trò: **Client Member** (`vy.ngo@anphatland.vn`) → **PM** (`minhanh@saokim
 |---|---|---|---|---|
 | C2.1 | Vy | Mở `/onboarding` | Thấy dự án **Website An Phát Land**, tiến độ **60%** | [ ] |
 | C2.2 | Vy | Đếm 5 mục | `Hồ sơ doanh nghiệp` ✅ · `Tài sản thương hiệu hiện có` ✅ · `Nội dung giới thiệu dự án` **Cần làm** · `Thông tin hosting & domain` **Đã nộp** · `Xác nhận lịch kickoff` ✅ | [ ] |
-| C2.3 | Vy | Ở mục "Nội dung giới thiệu dự án": **chọn một tệp bất kỳ** (pdf/ảnh) rồi bấm **Nộp** | Toast **`Đã nộp <tên-tệp> (phiên bản 1)`**; mục → **Đã nộp** kèm dòng 📎 *tên tệp v1* + link **Tải**; tiến độ **vẫn 60%** (nộp ≠ được duyệt) | [ ] |
-| C2.3b | Vy | Bấm **Tải** ở tệp vừa nộp | Tệp tải về đúng nội dung bạn vừa chọn | [ ] |
-| C2.3c | Vy | Nộp lại mục đó **sau khi PM yêu cầu bổ sung** (làm ở C2.6 rồi quay lại) | Toast **`Đã nộp <tên-tệp> (phiên bản 2)`** — cùng một tệp, **thêm phiên bản**, không tạo tệp trùng | [ ] |
-| C2.4 | Vy | Mở lại Brand brief, sửa 1 ô rồi bấm **Lưu nháp** | Toast **"Đã lưu nháp"** | [ ] |
-| C2.5 | Vy→PM | Đăng xuất, đăng nhập `minhanh@saokim.vn`, mở `/onboarding` | Thấy nút **Đạt** và **Yêu cầu bổ sung** (khách không có 2 nút này) | [ ] |
-| C2.6 | PM | Ở mục "Nội dung giới thiệu dự án", gõ lý do vào ô "Cần bổ sung gì?" rồi bấm **Yêu cầu bổ sung** | Toast **"Đã yêu cầu bổ sung"**; mục → **Cần bổ sung**, có dòng `PM yêu cầu: …` | [ ] |
-| C2.7 | PM | Bấm **Đạt** ở mục đó | Toast **"Đã duyệt mục"**; tiến độ **80%** | [ ] |
-| C2.8 | PM | Bấm **Hoàn tất onboarding** (KHÔNG tick override) | Toast lỗi **"Còn 1 mục bắt buộc chưa đạt"** (mục hosting còn ở "Đã nộp") | [ ] |
-| C2.9 | PM | Gõ lý do vào ô "Lý do bỏ qua" rồi bấm **Hoàn tất onboarding** | Toast **"Onboarding đã hoàn tất"**; checklist → **Hoàn tất** | [ ] |
-| C2.10 | Vy | Ở khối **Tài liệu yêu cầu**, xem 2 dòng | Nhãn đúng: `Nội dung giới thiệu dự án` → **Cần nộp** · `Thông tin hosting & domain` → **Đã nhận** | [ ] |
-| C2.11 | Vy | Ở dòng **Cần nộp**, chọn tệp rồi bấm **Nộp** | Toast **`Đã nộp <tên-tệp> (phiên bản 1)`**; nhãn chuyển **Đã nhận** + có link tải | [ ] |
+| C2.3 | Vy | **Bấm vào tên mục** "Nội dung giới thiệu dự án" để mở ra | Mục mở rộng (collapse) thành: ô **Nội dung trả lời**, nút **Nộp**, khu **Tập tin** + nút **Đính kèm** | [ ] |
+| C2.4 | Vy | Gõ nội dung vào ô "Nội dung trả lời" (vd: *"Đã tổng hợp theo brief"*) | — | [ ] |
+| C2.5 | Vy | Ở ô chọn tệp: chọn **2 tệp** (một .pdf, một ảnh) rồi bấm **Đính kèm** | Toast **"Đã đính kèm 2 tệp"**; hiện **2 card tệp**: icon tròn theo loại tệp (PDF đỏ, ảnh xanh), **tên tệp**, **dung lượng**, nút **Tải** và **Gỡ**; dòng **Tập tin (2)** | [ ] |
+| C2.6 | Vy | Bấm **Tải** ở một card | Tệp tải về đúng nội dung | [ ] |
+| C2.7 | Vy | Bấm **Gỡ** ở một card | Toast **"Đã gỡ tệp khỏi mục"**; card biến mất, **Tập tin (1)**. Vào tab **Tệp** của dự án: tệp đó **vẫn còn** (xoá mềm) | [ ] |
+| C2.8 | Vy | Bấm **Nộp** | Toast **"Đã nộp mục này"**; mục → **Đã nộp**, trên dòng tóm tắt hiện **có nội dung** + **1 tệp**; tiến độ **vẫn 60%** (nộp ≠ được duyệt) | [ ] |
+| C2.9 | Vy | Mở lại **Brand brief**, sửa 1 ô rồi bấm **Lưu nháp** | Toast **"Đã lưu nháp"** | [ ] |
+| C2.10 | Vy | Ở khối **Tài liệu cần cung cấp**, xem 2 dòng | Nhãn đúng: `Nội dung giới thiệu dự án` → **Cần nộp** · `Thông tin hosting & domain` → **Đã nhận** (mục này có sẵn 1 tệp) | [ ] |
+| C2.11 | Vy | Mở dòng **Đã nhận** ra | Thấy **Tập tin (1)** với card *Wireframe trang chủ* + nút Tải | [ ] |
+| C2.12 | Vy→PM | Đăng xuất, đăng nhập `minhanh@saokim.vn`, mở `/onboarding`, mở mục ra | Thấy nội dung khách nhập + các card tệp + nút **Đạt** / **Yêu cầu bổ sung** (khách không có 2 nút này) | [ ] |
+| C2.13 | PM | Gõ lý do vào ô "Cần bổ sung gì?" rồi bấm **Yêu cầu bổ sung** | Toast **"Đã yêu cầu bổ sung"**; mục → **Cần bổ sung**, có dòng `PM yêu cầu: …` | [ ] |
+| C2.14 | PM | Bấm **Đạt** ở mục đó | Toast **"Đã duyệt mục"**; tiến độ **80%**; mục hiện **"Mục đã được duyệt và khoá."** và **không còn** nút Đính kèm/Gỡ | [ ] |
+| C2.15 | PM | Bấm **Hoàn tất onboarding** (KHÔNG tick override) | Toast lỗi **"Còn 1 mục bắt buộc chưa đạt"** (mục hosting còn ở "Đã nộp") | [ ] |
+| C2.16 | PM | Gõ lý do vào ô "Lý do bỏ qua" rồi bấm **Hoàn tất onboarding** | Toast **"Onboarding đã hoàn tất"**; checklist → **Hoàn tất** | [ ] |
 
 > **C2.3 kiểm tra điều quan trọng:** nộp ≠ đạt. Tiến độ chỉ tính mục **đã được PM duyệt**.
 > **C2.8 kiểm tra cổng kickoff:** không được bỏ qua mục bắt buộc mà không có lý do.
@@ -374,7 +377,7 @@ npm run pg:dry-run
 | A | Chuẩn bị môi trường | 6 | ___/6 | |
 | B | Cổng tự động | 6 | ___/6 | |
 | C1 | Đăng nhập & phân quyền | 8 | ___/8 | |
-| C2 | Onboarding | 12 | ___/12 | |
+| C2 | Onboarding | 18 | ___/18 | |
 | C3 | Delivery vòng đời phiên bản | 14 | ___/14 | |
 | C4 | Bàn giao | 5 | ___/5 | |
 | C5 | AI-native | 11 | ___/11 | |
@@ -382,7 +385,7 @@ npm run pg:dry-run
 | C7 | Growth & Retaining | 13 | ___/13 | |
 | D | Kiểm tra âm | 12 | ___/12 | |
 | E | Kiểm tra dữ liệu | 7 | ___/7 | |
-| | **TỔNG** | **101** | **___/101** | |
+| | **TỔNG** | **107** | **___/107** | |
 
 **Ghi lại khi có lỗi:**
 ```
