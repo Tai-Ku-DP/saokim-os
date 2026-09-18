@@ -163,11 +163,18 @@ organization sau khi nhận lời mời) hoặc org switcher ở topbar (P7).
 bị đá về `/today`; người chưa đăng nhập bị đá về `/sign-in`. Trong Server Action thì
 `requireStaff()` **ném lỗi** (không redirect) để action trả về thông báo thay vì nhảy trang.
 
-**Không có quyền ở tầng trang = 404, không phải 500:** loader cho trang dùng
-`checkProjectAccess` — trả `null` khi bị từ chối, page gọi `notFound()` để hiện
-`not-found.tsx` ("…hoặc bạn không có quyền xem"). Ném `ForbiddenError` từ page chỉ đẩy
-người dùng vào error boundary chung, mà vẫn lộ dự án nào đang tồn tại.
+**Không có quyền ở tầng trang → hiện trang "không tìm thấy", không phải lỗi 500:** loader
+cho trang dùng `checkProjectAccess` — trả `null` khi bị từ chối, page gọi `notFound()` để hiện
+`not-found.tsx` ("…hoặc bạn không có quyền xem"). Ném `ForbiddenError` từ page chỉ đẩy người
+dùng vào error boundary chung, mà vẫn lộ dự án nào đang tồn tại.
 `assertProjectAccess` vẫn **ném** (403 kèm lý do) cho Server Action / Route Handler.
+
+> ⚠️ **Lưu ý đã kiểm chứng trên dev server:** vì `(app)` có `loading.tsx` nên shell được stream
+> trước khi page chạy `notFound()`. Hệ quả: **HTTP status vẫn là 200** dù nội dung là trang
+> "không tìm thấy" (đã đo: designer truy cập dự án không được phân công → 200 + nội dung 404).
+> Với portal có đăng nhập thì điều này chấp nhận được (không ảnh hưởng SEO/crawler). Nếu cần
+> status 404 thật: chuyển kiểm tra quyền lên `projects/[projectId]/layout.tsx` và tắt streaming
+> cho nhánh đó, hoặc gọi `notFound()` trong layout trước khi shell render.
 
 **Luật cứng:**
 1. Mọi Server Action và Route Handler **tự authorize** — Next 16 coi action là POST endpoint công khai.
