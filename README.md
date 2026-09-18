@@ -64,8 +64,8 @@ AI SDK 7.0.105 + @ai-sdk/deepseek 3.0.47 (generative UI bằng tool-calling)
 | P3 | Today · Projects · File review · Approvals · Handover | ✅ xong |
 | P4 | Onboarding hub (template, checklist, brand brief, tài liệu, cổng kickoff) | ✅ xong |
 | P5 | AI gateway + generative UI + tool catalog + guardrails + cost cap | ✅ xong |
-| P6 | Growth + Retaining (Brand Home) | ⏳ tiếp theo |
-| P7 | Outbox/notification + n8n + dashboards | ⏳ |
+| P6 | Growth + Retaining (lộ trình, đề xuất, Brand Home, yêu cầu dịch vụ) | ✅ xong |
+| P7 | Outbox worker + notification + n8n + dashboards | ⏳ tiếp theo |
 | P8 | Hardening + a11y + runbook Postgres | ⏳ |
 
 ### Tài khoản demo (sau `npm run db:seed`)
