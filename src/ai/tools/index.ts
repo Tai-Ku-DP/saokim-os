@@ -23,6 +23,7 @@ export const READ_TOOL_NAMES = [
   "showApprovals",
   "showGrowthRoadmap",
   "summarizeApproval",
+  "listFiles",
 ] as const;
 
 export const WRITE_TOOL_NAMES = [

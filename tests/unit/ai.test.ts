@@ -47,7 +47,7 @@ describe("hợp đồng tool ↔ renderer", () => {
   });
 
   it("không có renderer mồ côi", () => {
-    const known = new Set<string>([...READ_TOOL_NAMES, ...WRITE_TOOL_NAMES, "listFiles"]);
+    const known = new Set<string>([...READ_TOOL_NAMES, ...WRITE_TOOL_NAMES]);
     for (const name of Object.keys(RENDERED_TOOLS)) {
       expect(known.has(name), `renderer ${name} không có tool`).toBe(true);
     }

@@ -9,7 +9,7 @@
 | P2 | 39 bảng Drizzle + migration + seed + better-auth + RBAC 2 tầng | ✅ | 32 test (ma trận quyền + isolation) |
 | P3 | Today · Projects · File review · Approvals · Handover | ✅ | 12 test bất biến + smoke HTTP |
 | P4 | Onboarding hub (template 8 loại dự án + cổng kickoff) | ✅ | 12 test (AC-ONB-001→005) |
-| P5 | AI gateway + generative UI + 7 tool đọc + 3 tool ghi có xác nhận | ✅ | 29 test + smoke HTTP (stream, cap, 401) |
+| P5 | AI gateway + generative UI + 8 tool đọc + 3 tool ghi có xác nhận | ✅ | 29 test + smoke HTTP (stream, cap, 401) |
 | P6 | Growth + Retaining (Brand Home) | ✅ | 10 test (AC-GRO/RET) |
 | P7 | Outbox worker + notification + n8n + Inbox/Clients/Reports | ✅ | 7 test outbox (retry/backoff/idempotency) + smoke |
 | P8 | Hardening, a11y, docs, artifacts Postgres | ✅ | 99 test tổng; `pg:dry-run` đếm 145 dòng |

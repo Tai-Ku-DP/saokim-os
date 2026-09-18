@@ -45,6 +45,7 @@ npm run dev                    # http://localhost:3000
 | [`docs/04-ai-native.md`](docs/04-ai-native.md) | AI gateway, hợp đồng generative UI, catalog tool, guardrails, chi phí |
 | [`docs/05-data-model.md`](docs/05-data-model.md) | ~24 bảng, quan hệ, index, bất biến nghiệp vụ |
 | [`docs/06-lo-trinh-va-nghiem-thu.md`](docs/06-lo-trinh-va-nghiem-thu.md) | Phase 0–8, migration PMS, DoD, acceptance criteria → test ID, câu hỏi mở |
+| [`docs/07-luong-nghiep-vu.md`](docs/07-luong-nghiep-vu.md) | **Luồng đang chạy thật**: kiến trúc request, xác thực, lời mời, phân quyền, onboarding, delivery, Today, AI-native, outbox, growth + bảng tra bất biến nằm ở file nào |
 | [`AGENTS.md`](AGENTS.md) | Luật bắt buộc cho coding agent |
 
 ## Stack
