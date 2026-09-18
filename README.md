@@ -61,8 +61,8 @@ AI SDK 7.0.105 + @ai-sdk/deepseek 3.0.47 (generative UI bằng tool-calling)
 | P0 | Nền tảng: Next 16, token, shadcn, pin version | ✅ xong |
 | P1 | Design system + app shell + ⌘K + light/dark | ✅ xong |
 | P2 | Drizzle schema (39 bảng) + migration + seed + better-auth + RBAC 2 tầng + guard + login/invite | ✅ xong |
-| P3 | Today · Projects · File review · Approvals · Handover | ⏳ tiếp theo |
-| P4 | Onboarding hub | ⏳ |
+| P3 | Today · Projects · File review · Approvals · Handover | ✅ xong |
+| P4 | Onboarding hub | ⏳ tiếp theo |
 | P5 | AI gateway + generative UI + 6 tính năng AI | ⏳ |
 | P6 | Growth + Retaining (Brand Home) | ⏳ |
 | P7 | Outbox/notification + n8n + dashboards | ⏳ |
