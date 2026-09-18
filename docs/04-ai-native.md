@@ -1,5 +1,14 @@
 # 04 — Tầng AI-native & generative UI
 
+> **Trạng thái P5 (đã triển khai):** gateway DeepSeek + registry, 5 tool đọc chạy thật
+> (đã scope theo quyền), 3 tool ghi dạng card xác nhận, log `ai_run`, cap chi phí theo
+> tổ chức/ngày, panel AI ở topbar + ⌘K.
+>
+> **Chế độ `AI_DRIVER=mock`:** khi chưa có `DEEPSEEK_API_KEY`, gateway thay model bằng bộ
+> chọn ý định tất định nhưng **tool vẫn chạy thật trên dữ liệu đã scope** — dùng để demo
+> và kiểm thử luồng generative UI mà không cần gọi mạng. Panel hiện nhãn `demo`.
+> Không có key và driver = `deepseek` → trả lỗi rõ ràng, **không** bịa câu trả lời.
+
 > Stack: `ai@7.0.105` · `@ai-sdk/deepseek@3.0.47` · `@ai-sdk/react@4.0.108` · `zod@4.6.5`.
 > Nguyên tắc gốc: **AI làm phần nhàm chán, con người quyết định.**
 

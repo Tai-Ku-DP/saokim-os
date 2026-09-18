@@ -21,10 +21,12 @@ export function CommandPalette({
   open,
   onOpenChange,
   viewerType,
+  onAskAi,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   viewerType: ViewerType;
+  onAskAi?: () => void;
 }) {
   const router = useRouter();
   const groups = navFor(viewerType);
@@ -50,10 +52,15 @@ export function CommandPalette({
         </CommandGroup>
         <CommandSeparator />
         <CommandGroup heading="Trợ lý">
-          <CommandItem value="hỏi ai trợ lý" onSelect={() => go("/today")}>
+          <CommandItem
+            value="hỏi ai trợ lý"
+            onSelect={() => {
+              onOpenChange(false);
+              onAskAi?.();
+            }}
+          >
             <Sparkles size={14} aria-hidden className="text-hot" />
             <span>Hỏi trợ lý AI</span>
-            <span className="ml-auto label-xs">P5</span>
           </CommandItem>
         </CommandGroup>
       </CommandList>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Bell, ChevronsUpDown, LogOut, Monitor, Moon, Search, Sparkles, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { CommandPalette } from "@/components/shell/command-palette";
+import { AiPanel } from "@/components/ai/ai-panel";
+import type { PromptKey } from "@/ai/prompts";
 import { signOutAction } from "@/server/actions/auth";
 import { cn } from "@/lib/utils";
 import type { Viewer } from "@/server/auth/viewer";
@@ -38,9 +41,31 @@ function ThemeItems() {
   );
 }
 
-export function Topbar({ viewer, unreadCount = 0 }: { viewer: Viewer; unreadCount?: number }) {
+export function Topbar({
+  viewer,
+  unreadCount = 0,
+  aiCanWrite = false,
+  aiDemo = false,
+}: {
+  viewer: Viewer;
+  unreadCount?: number;
+  aiCanWrite?: boolean;
+  aiDemo?: boolean;
+}) {
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Ngữ cảnh cho prompt: bề mặt nào + dự án nào (nếu đang trong một dự án).
+  const projectId = pathname.match(/^\/projects\/([^/]+)/)?.[1];
+  const surface: PromptKey = pathname.startsWith("/today")
+    ? "today.v1"
+    : pathname.startsWith("/projects")
+      ? "workroom.v1"
+      : pathname.startsWith("/brand-vault") || pathname.startsWith("/growth")
+        ? "brand-home.v1"
+        : "general.v1";
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -75,7 +100,13 @@ export function Topbar({ viewer, unreadCount = 0 }: { viewer: Viewer; unreadCoun
       <div className="ml-auto flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="text-ink-2" aria-label="Trợ lý AI">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-ink-2"
+              aria-label="Trợ lý AI"
+              onClick={() => setAiOpen(true)}
+            >
               <Sparkles size={15} aria-hidden />
             </Button>
           </TooltipTrigger>
@@ -136,7 +167,22 @@ export function Topbar({ viewer, unreadCount = 0 }: { viewer: Viewer; unreadCoun
         open={paletteOpen}
         onOpenChange={setPaletteOpen}
         viewerType={viewer.type}
+        onAskAi={() => setAiOpen(true)}
       />
+
+      <Sheet open={aiOpen} onOpenChange={setAiOpen}>
+        <SheetContent side="right" className="w-full p-0 sm:max-w-md">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Trợ lý AI</SheetTitle>
+          </SheetHeader>
+          <AiPanel
+            surface={surface}
+            projectId={projectId}
+            canWrite={aiCanWrite}
+            demo={aiDemo}
+          />
+        </SheetContent>
+      </Sheet>
     </header>
   );
 }
