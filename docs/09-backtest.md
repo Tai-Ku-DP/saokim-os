@@ -170,7 +170,9 @@ Vai trò: **Client Member** (`vy.ngo@anphatland.vn`) → **PM** (`minhanh@saokim
 | C2.2 | Vy | Đếm 5 mục | `Hồ sơ doanh nghiệp` ✅ · `Tài sản thương hiệu hiện có` ✅ · `Nội dung giới thiệu dự án` **Cần làm** · `Thông tin hosting & domain` **Đã nộp** · `Xác nhận lịch kickoff` ✅ | [ ] |
 | C2.3 | Vy | **Bấm vào tên mục** "Nội dung giới thiệu dự án" để mở ra | Mục mở rộng (collapse) thành: ô **Nội dung trả lời**, nút **Nộp**, khu **Tập tin** + nút **Đính kèm** | [ ] |
 | C2.4 | Vy | Gõ nội dung vào ô "Nội dung trả lời" (vd: *"Đã tổng hợp theo brief"*) | — | [ ] |
-| C2.5 | Vy | Ở ô chọn tệp: chọn **2 tệp** (một .pdf, một ảnh) rồi bấm **Đính kèm** | Toast **"Đã đính kèm 2 tệp"**; hiện **2 card tệp**: icon tròn theo loại tệp (PDF đỏ, ảnh xanh), **tên tệp**, **dung lượng**, nút **Tải** và **Gỡ**; dòng **Tập tin (2)** | [ ] |
+| C2.5 | Vy | Bấm **"Chọn tệp để đính kèm"** → chọn **1 tệp .pdf** | Toast **"Đã đính kèm <tên-tệp>"** — **tải lên ngay khi chọn**, không cần bấm thêm bước nào | [ ] |
+| C2.5b | Vy | Bấm lại **"Chọn tệp để đính kèm"** → chọn **1 tệp ảnh** | Toast **"Đã đính kèm <tên-tệp>"**; giờ có **2 card** và dòng **Tập tin (2)**; icon đổi màu theo loại (PDF đỏ, ảnh xanh) | [ ] |
+| C2.5c | Vy | **Tải lại trang (F5)** | **2 card tệp vẫn còn** — đây là điểm từng bị hiểu nhầm là mất tệp | [ ] |
 | C2.6 | Vy | Bấm **Tải** ở một card | Tệp tải về đúng nội dung | [ ] |
 | C2.7 | Vy | Bấm **Gỡ** ở một card | Toast **"Đã gỡ tệp khỏi mục"**; card biến mất, **Tập tin (1)**. Vào tab **Tệp** của dự án: tệp đó **vẫn còn** (xoá mềm) | [ ] |
 | C2.8 | Vy | Bấm **Nộp** | Toast **"Đã nộp mục này"**; mục → **Đã nộp**, trên dòng tóm tắt hiện **có nội dung** + **1 tệp**; tiến độ **vẫn 60%** (nộp ≠ được duyệt) | [ ] |

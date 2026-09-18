@@ -162,7 +162,13 @@ export function AttachmentList({
   );
 }
 
-/** Ô chọn nhiều tệp + nút đính kèm. */
+/**
+ * Ô đính kèm: **chọn tệp là tải lên ngay** (không có bước bấm thêm).
+ *
+ * Vì sao đổi: bản trước có 2 bước (chọn tệp → bấm "Đính kèm") với nút native
+ * "Choose Files" tiếng Anh, người dùng chọn tệp xong tưởng đã lưu → không bấm nữa → mất tệp.
+ * Giờ: input ẩn + label tiếng Việt, `onChange` tự submit form.
+ */
 export function AttachFilesForm({
   kind,
   ownerId,
@@ -174,27 +180,51 @@ export function AttachFilesForm({
     ok: false,
   });
   const formRef = useRef<HTMLFormElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   useToasts(state);
 
+  // Sau mỗi lần chọn (thành công hay lỗi) phải reset input, nếu không chọn lại cùng
+  // một tệp sẽ không kích hoạt onChange.
   useEffect(() => {
-    if (state.message) formRef.current?.reset();
+    if (state.message || state.error) {
+      formRef.current?.reset();
+      if (inputRef.current) inputRef.current.value = "";
+    }
   }, [state]);
 
+  const inputId = `attach-${kind}-${ownerId}`;
+
   return (
-    <form ref={formRef} action={attach} className="flex flex-wrap items-center gap-2">
+    <form ref={formRef} action={attach} className="grid gap-1">
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="ownerId" value={ownerId} />
       <input
+        ref={inputRef}
+        id={inputId}
         type="file"
         name="files"
         multiple
-        aria-label="Chọn tệp để đính kèm"
-        className="h-7 max-w-64 cursor-pointer rounded-md border border-line bg-surface px-1.5 text-[11px] file:mr-1.5 file:rounded file:border-0 file:bg-surface-2 file:px-1.5 file:py-0.5 file:text-[11px]"
+        className="sr-only"
+        onChange={(event) => {
+          if (event.currentTarget.files && event.currentTarget.files.length > 0) {
+            event.currentTarget.form?.requestSubmit();
+          }
+        }}
       />
-      <Button type="submit" size="xs" variant="outline" disabled={pending}>
-        <Paperclip size={12} aria-hidden />
-        {pending ? "Đang tải…" : "Đính kèm"}
-      </Button>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label
+          htmlFor={inputId}
+          className={cn(
+            "inline-flex h-6 cursor-pointer items-center gap-1.5 rounded-md border border-line bg-surface px-2 text-[11px] font-medium text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink",
+            pending && "pointer-events-none opacity-60",
+          )}
+        >
+          <Paperclip size={12} aria-hidden />
+          {pending ? "Đang tải lên…" : "Chọn tệp để đính kèm"}
+        </label>
+        <span className="text-[10.5px] text-ink-3">Lưu ngay khi chọn · tối đa 25MB mỗi tệp</span>
+      </div>
     </form>
   );
 }

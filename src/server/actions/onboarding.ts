@@ -15,7 +15,7 @@ import {
   submitChecklistItem,
   markDocumentReceived,
 } from "@/server/services/onboarding";
-import { MAX_UPLOAD_BYTES } from "@/server/upload";
+import { readUploads } from "@/server/upload";
 
 /** Server Action cho Onboarding Hub — mỗi action tự xác thực rồi gọi service. */
 
@@ -72,24 +72,19 @@ export async function attachFilesAction(
     const ownerId = String(formData.get("ownerId") ?? "");
     if (!ownerId) return { ok: false, error: "Thiếu mục cần đính kèm" };
 
-    const uploads = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
-    if (uploads.length === 0) return { ok: false, error: "Chưa chọn tệp nào" };
+    const upload = await readUploads(formData);
+    if (!upload.ok) return { ok: false, error: upload.error };
 
-    const files = [];
-    for (const upload of uploads) {
-      if (upload.size > MAX_UPLOAD_BYTES) {
-        return { ok: false, error: `Tệp "${upload.name}" vượt 25MB` };
-      }
-      files.push({ fileName: upload.name, data: new Uint8Array(await upload.arrayBuffer()) });
-    }
-
-    const result = await attachFiles(ctx, { kind, ownerId, files });
+    const result = await attachFiles(ctx, { kind, ownerId, files: upload.files });
 
     revalidatePath("/onboarding");
     revalidatePath("/projects", "layout");
     return {
       ok: true,
-      message: result.attached === 1 ? `Đã đính kèm ${files[0]!.fileName}` : `Đã đính kèm ${result.attached} tệp`,
+      message:
+        result.attached === 1
+          ? `Đã đính kèm ${upload.files[0]!.fileName}`
+          : `Đã đính kèm ${result.attached} tệp`,
     };
   } catch (error) {
     return toActionResult(error);
