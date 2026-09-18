@@ -30,7 +30,7 @@ async function twoOrgs() {
   return { db, sqlite };
 }
 
-describe("cô lập theo tổ chức", () => {
+describe("NFR-PRIVACY + AC-DEL-001: cô lập theo tổ chức", () => {
   it("truy vấn có scope chỉ trả dự án của công ty mình", async () => {
     const { db, sqlite } = await twoOrgs();
 

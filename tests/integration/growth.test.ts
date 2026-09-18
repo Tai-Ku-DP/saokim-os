@@ -193,7 +193,7 @@ describe("AC-RET-001/002/003 — Brand Home", () => {
     expect(home.healthScore).toBe(62);
   });
 
-  it("khách hàng công ty khác không xem được Brand Home (NFR Privacy)", async () => {
+  it("AC-RET-002 + NFR-PRIVACY: khách công ty khác không xem được Brand Home", async () => {
     await expect(getBrandHome(clientOwner, OTHER)).rejects.toBeInstanceOf(Error);
   });
 

@@ -132,7 +132,7 @@ describe("phiên bản tệp (AC-DEL-002, AC-DEL-004)", () => {
     expect(new Set(rows.map((r) => r.storageKey)).size).toBe(3);
   });
 
-  it("thao tác ghi đều để lại audit log và outbox trong cùng transaction", async () => {
+  it("NFR-AUDIT + docs/05 §6.8: ghi để lại audit log và outbox trong cùng transaction", async () => {
     const fileId = await createFile(pm, { projectId: PROJECT, name: "Logo", kind: "design", visibility: "client" });
     await addVersion(pm, { fileId, fileName: "logo-v1.pdf", data: bytes("v1") });
 
@@ -272,7 +272,7 @@ describe("duyệt (AC-DEL-006, PRD §14)", () => {
   });
 });
 
-describe("cô lập tổ chức ở tầng service (NFR Privacy)", () => {
+describe("NFR-PRIVACY: cô lập tổ chức ở tầng service", () => {
   beforeEach(reset);
 
   it("khách hàng công ty A không đọc được dự án công ty B", async () => {

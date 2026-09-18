@@ -1,5 +1,34 @@
 # 06 — Lộ trình, migration & nghiệm thu
 
+## 0. Trạng thái triển khai (cập nhật cuối)
+
+| Phase | Nội dung | Trạng thái | Bằng chứng |
+|---|---|---|---|
+| P0 | Nền tảng Next 16 + Tailwind 4 + shadcn, pin version | ✅ | build pass, 22 route |
+| P1 | Design token + app shell + ⌘K + light/dark | ✅ | smoke test 2 vai trò |
+| P2 | 39 bảng Drizzle + migration + seed + better-auth + RBAC 2 tầng | ✅ | 32 test (ma trận quyền + isolation) |
+| P3 | Today · Projects · File review · Approvals · Handover | ✅ | 12 test bất biến + smoke HTTP |
+| P4 | Onboarding hub (template 8 loại dự án + cổng kickoff) | ✅ | 12 test (AC-ONB-001→005) |
+| P5 | AI gateway + generative UI + 7 tool đọc + 3 tool ghi có xác nhận | ✅ | 29 test + smoke HTTP (stream, cap, 401) |
+| P6 | Growth + Retaining (Brand Home) | ✅ | 10 test (AC-GRO/RET) |
+| P7 | Outbox worker + notification + n8n + Inbox/Clients/Reports | ✅ | 7 test outbox (retry/backoff/idempotency) + smoke |
+| P8 | Hardening, a11y, docs, artifacts Postgres | ✅ | 99 test tổng; `pg:dry-run` đếm 145 dòng |
+
+**Cổng chất lượng cuối:** `npm run typecheck` · `npm run lint` · `npm run build` (22 route) ·
+`npm test` (**99 test / 10 file**) — tất cả xanh.
+
+**Đo NFR-PERF (PRD §17 yêu cầu dashboard < 3s):** đo trên dev server với dữ liệu seed —
+`/today` 0.046s · `/projects` 0.036s · `/onboarding` 0.043s · `/brand-vault` 0.043s.
+
+**Chưa làm (có lý do, không phải bỏ sót):**
+- Chữ ký số / phê duyệt pháp lý → phase sau (PRD §24).
+- Zalo hai chiều → hiện một chiều qua n8n; hai chiều cần Zalo OA API + kịch bản.
+- `src/db/pg/*` → cố ý chưa viết (bước ~1 ngày, viết lúc migrate); runbook + script copy
+  đã sẵn sàng trong docs/01 §8.
+- SSO/2FA → plugin 2FA đã bật được, SSO để phase sau.
+- Chart library → cố ý không dùng ở MVP (ADR-006).
+
+
 ---
 
 ## 1. Phase triển khai (map PRD §21)
