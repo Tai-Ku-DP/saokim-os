@@ -65,7 +65,18 @@ const TASK_STATUS: Record<string, { label: string; tone: Tone }> = {
   done: { label: "Xong", tone: "success" },
 };
 
+/**
+ * Trạng thái "tài liệu cần cung cấp" — KHÁC checklist: pending nghĩa là CHƯA nộp.
+ * (Trước đây mượn nhãn checklist nên pending bị hiện thành "Đã nộp" — sai.)
+ */
+const DOCUMENT_STATUS: Record<string, { label: string; tone: Tone }> = {
+  pending: { label: "Cần nộp", tone: "warning" },
+  received: { label: "Đã nhận", tone: "success" },
+  waived: { label: "Miễn", tone: "neutral" },
+};
+
 const MAPS = {
+  document: DOCUMENT_STATUS,
   project: PROJECT_STATUS,
   milestone: MILESTONE_STATUS,
   version: VERSION_STATUS,

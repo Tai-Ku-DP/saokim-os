@@ -12,13 +12,12 @@ import {
   resolveFeedback,
 } from "@/server/services/files";
 import { toActionResult, type ActionResult } from "@/server/services/errors";
+import { readUpload } from "@/server/upload";
 
 /**
  * Server Action cho Delivery Hub. Mọi action tự xác thực (Next 16 coi action là
  * endpoint POST công khai) rồi mới gọi service — service kiểm tra quyền lần nữa.
  */
-
-const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25MB — PRD §17 yêu cầu giới hạn rõ ràng
 
 export async function uploadVersionAction(
   _prev: ActionResult,
@@ -28,22 +27,17 @@ export async function uploadVersionAction(
     const ctx = await requireSession();
     const fileId = String(formData.get("fileId") ?? "");
     const note = String(formData.get("note") ?? "").trim();
-    const upload = formData.get("file");
 
     if (!fileId) return { ok: false, error: "Thiếu tệp" };
-    if (!(upload instanceof File) || upload.size === 0) {
-      return { ok: false, error: "Chọn tệp để tải lên" };
-    }
-    if (upload.size > MAX_UPLOAD_BYTES) {
-      return { ok: false, error: "Tệp vượt 25MB. Nén lại hoặc gửi link" };
-    }
 
-    const data = new Uint8Array(await upload.arrayBuffer());
+    const upload = await readUpload(formData);
+    if (!upload.ok) return { ok: false, error: upload.error };
+
     const result = await addVersion(ctx, {
       fileId,
-      fileName: upload.name,
+      fileName: upload.fileName,
       note: note || undefined,
-      data,
+      data: upload.data,
     });
 
     revalidatePath("/projects", "layout");

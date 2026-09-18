@@ -12,7 +12,10 @@ import {
   reviewChecklistItem,
   saveBrandBrief,
   submitChecklistItem,
+  submitChecklistItemWithFile,
+  uploadDocumentFile,
 } from "@/server/services/onboarding";
+import { readUpload } from "@/server/upload";
 
 /** Server Action cho Onboarding Hub — mỗi action tự xác thực rồi gọi service. */
 
@@ -33,6 +36,11 @@ export async function createChecklistAction(
   }
 }
 
+/**
+ * Nộp một mục onboarding. Hai đường:
+ *  - có tệp  → lưu tệp (StoragePort + phiên bản) rồi mới đánh dấu đã nộp (AC-ONB-002)
+ *  - không tệp → chỉ đánh dấu đã nộp (dùng cho mục xác nhận, ví dụ "Xác nhận lịch kickoff")
+ */
 export async function submitChecklistItemAction(
   _prev: ActionResult,
   formData: FormData,
@@ -42,10 +50,58 @@ export async function submitChecklistItemAction(
     const itemId = String(formData.get("itemId") ?? "");
     if (!itemId) return { ok: false, error: "Thiếu mục cần nộp" };
 
+    const hasFile = formData.get("file") instanceof File && (formData.get("file") as File).size > 0;
+
+    if (hasFile) {
+      const upload = await readUpload(formData);
+      if (!upload.ok) return { ok: false, error: upload.error };
+
+      const note = String(formData.get("note") ?? "").trim() || undefined;
+      const result = await submitChecklistItemWithFile(ctx, {
+        itemId,
+        fileName: upload.fileName,
+        note,
+        data: upload.data,
+      });
+
+      revalidatePath("/onboarding");
+      revalidatePath("/today");
+      revalidatePath("/projects", "layout");
+      return { ok: true, message: `Đã nộp ${upload.fileName} (phiên bản ${result.versionNumber})` };
+    }
+
     await submitChecklistItem(ctx, itemId);
     revalidatePath("/onboarding");
     revalidatePath("/today");
     return { ok: true, message: "Đã nộp mục này" };
+  } catch (error) {
+    return toActionResult(error);
+  }
+}
+
+/** Nộp tệp cho một "tài liệu cần cung cấp" — bắt buộc có tệp. */
+export async function uploadDocumentAction(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const ctx = await requireSession();
+    const documentId = String(formData.get("documentId") ?? "");
+    if (!documentId) return { ok: false, error: "Thiếu tài liệu cần nộp" };
+
+    const upload = await readUpload(formData);
+    if (!upload.ok) return { ok: false, error: upload.error };
+
+    const result = await uploadDocumentFile(ctx, {
+      documentId,
+      fileName: upload.fileName,
+      data: upload.data,
+    });
+
+    revalidatePath("/onboarding");
+    revalidatePath("/today");
+    revalidatePath("/projects", "layout");
+    return { ok: true, message: `Đã nộp ${upload.fileName} (phiên bản ${result.versionNumber})` };
   } catch (error) {
     return toActionResult(error);
   }

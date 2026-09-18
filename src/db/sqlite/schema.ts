@@ -168,6 +168,9 @@ export const checklistItem = sqliteTable(
     completedAt: ts("completed_at"),
     orderIndex: integer("order_index").notNull().default(0),
     note: text("note"),
+    /** Tệp khách đã nộp cho mục này (AC-ONB-002). */
+    fileId: text("file_id").references(() => fileAsset.id, { onDelete: "set null" }),
+    submittedAt: ts("submitted_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

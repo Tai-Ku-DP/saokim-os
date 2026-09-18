@@ -8,6 +8,8 @@ import {
   BrandBriefForm,
   ChecklistItemActions,
   CompleteChecklist,
+  DocumentUploadForm,
+  SubmittedFileLink,
 } from "@/components/domain/onboarding-forms";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -126,6 +128,15 @@ export default async function OnboardingPage() {
                     {item.note ? (
                       <p className="w-full text-[11px] text-warning">PM yêu cầu: {item.note}</p>
                     ) : null}
+                    {item.fileLabel ? (
+                      <p className="w-full">
+                        <SubmittedFileLink
+                          label={item.fileLabel}
+                          version={item.fileVersion}
+                          versionId={item.fileVersionId}
+                        />
+                      </p>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -135,18 +146,19 @@ export default async function OnboardingPage() {
                   <p className="label-xs mb-1.5">Tài liệu yêu cầu</p>
                   <ul className="grid gap-1">
                     {checklist.documents.map((doc) => (
-                      <li key={doc.id} className="flex items-center gap-2 text-[12px]">
+                      <li key={doc.id} className="flex flex-wrap items-center gap-2 text-[12px]">
                         <span className="min-w-0 flex-1 truncate text-ink-2">{doc.label}</span>
-                        <StatusBadge
-                          kind="checklist"
-                          value={
-                            doc.status === "received"
-                              ? "approved"
-                              : doc.status === "waived"
-                                ? "todo"
-                                : "submitted"
-                          }
-                        />
+                        {doc.fileLabel ? (
+                          <SubmittedFileLink
+                            label={doc.fileLabel}
+                            version={doc.fileVersion}
+                            versionId={doc.fileVersionId}
+                          />
+                        ) : null}
+                        <StatusBadge kind="document" value={doc.status} />
+                        {doc.status === "pending" && canWrite ? (
+                          <DocumentUploadForm documentId={doc.id} />
+                        ) : null}
                       </li>
                     ))}
                   </ul>

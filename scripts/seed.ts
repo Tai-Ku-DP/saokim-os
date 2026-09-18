@@ -11,6 +11,7 @@ import { sql } from "drizzle-orm";
 import { db } from "../src/db/index";
 import * as schema from "../src/db/sqlite/schema";
 import { staffRoles } from "../src/server/auth/permissions";
+import { RESET_ORDER } from "../src/db/reset-order";
 
 const DEMO_PASSWORD = "BrandCare@2026";
 const ORG_ID = "seed_org_anphat";
@@ -39,17 +40,8 @@ const USERS: SeedUser[] = [
 ];
 
 async function reset() {
-  // Xoá theo thứ tự an toàn với FK (con trước, cha sau).
-  const order = [
-    "ai_feedback", "ai_run", "audit_log", "interaction_event", "notification_outbox",
-    "notification", "opportunity", "service_request", "growth_recommendation",
-    "brand_health_snapshot", "brand_scan_result", "brand_guideline", "brand_asset",
-    "handover_item", "handover_package", "issue_log", "meeting_note", "approval",
-    "feedback", "file_version", "file_asset", "task", "milestone", "document_request",
-    "brand_brief", "checklist_item", "onboarding_checklist", "project_member", "project",
-    "company_profile", "service_package", "invitation", "member", "organization",
-    "session", "account", "verification", "user",
-  ] as const;
+  // Thứ tự an toàn với FK — xem src/db/reset-order.ts để biết lý do.
+  const order = RESET_ORDER;
 
   for (const table of order) {
     await db.run(sql.raw(`delete from "${table}"`));

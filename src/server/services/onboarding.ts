@@ -17,6 +17,8 @@ import { assertProjectAccess } from "@/server/auth/project-access";
 import { can } from "@/server/auth/access";
 import { DomainError } from "./errors";
 import { enqueueInTx } from "./outbox";
+import { addVersion, createFile } from "./files";
+import { fileAsset, fileVersion } from "@/db/sqlite/schema";
 
 /**
  * Onboarding Hub (PRD §8). Bất biến quan trọng nhất:
@@ -107,6 +109,12 @@ export type ChecklistView = {
     note: string | null;
     dueAt: Date | null;
     orderIndex: number;
+    /** Tệp khách đã nộp (AC-ONB-002) */
+    fileId: string | null;
+    fileVersionId: string | null;
+    fileLabel: string | null;
+    fileVersion: number | null;
+    submittedAt: Date | null;
   }[];
   documents: {
     id: string;
@@ -114,6 +122,9 @@ export type ChecklistView = {
     required: boolean;
     status: "pending" | "received" | "waived";
     fileId: string | null;
+    fileVersionId: string | null;
+    fileLabel: string | null;
+    fileVersion: number | null;
   }[];
   canComplete: boolean;
 };
@@ -252,6 +263,8 @@ async function buildChecklistView(
       note: checklistItem.note,
       dueAt: checklistItem.dueAt,
       orderIndex: checklistItem.orderIndex,
+      fileId: checklistItem.fileId,
+      submittedAt: checklistItem.submittedAt,
     })
     .from(checklistItem)
     .where(eq(checklistItem.checklistId, checklistId))
@@ -268,6 +281,13 @@ async function buildChecklistView(
     .from(documentRequest)
     .where(eq(documentRequest.projectId, checklist.projectId));
 
+  // Tra tên tệp + phiên bản mới nhất cho mọi tệp đã nộp (item + document request).
+  const fileIds = [
+    ...items.map((item) => item.fileId),
+    ...documents.map((doc) => doc.fileId),
+  ].filter((id): id is string => Boolean(id));
+  const fileInfo = await lookupFiles(fileIds);
+
   const requiredItems = items.filter((item) => item.required);
   const approvedRequired = requiredItems.filter((item) => item.status === "approved").length;
 
@@ -283,14 +303,28 @@ async function buildChecklistView(
         : Math.round((approvedRequired / requiredItems.length) * 100),
     totalRequired: requiredItems.length,
     approvedRequired,
-    items,
-    documents,
+    items: items.map((item) => ({
+      ...item,
+      fileLabel: item.fileId ? (fileInfo.get(item.fileId)?.name ?? null) : null,
+      fileVersion: item.fileId ? (fileInfo.get(item.fileId)?.versionNumber ?? null) : null,
+      fileVersionId: item.fileId ? (fileInfo.get(item.fileId)?.versionId ?? null) : null,
+    })),
+    documents: documents.map((doc) => ({
+      ...doc,
+      fileLabel: doc.fileId ? (fileInfo.get(doc.fileId)?.name ?? null) : null,
+      fileVersion: doc.fileId ? (fileInfo.get(doc.fileId)?.versionNumber ?? null) : null,
+      fileVersionId: doc.fileId ? (fileInfo.get(doc.fileId)?.versionId ?? null) : null,
+    })),
     canComplete: approvedRequired === requiredItems.length,
   };
 }
 
 /** Khách nộp một mục (AC-ONB-002) → thông báo PM (AC-ONB-003). */
-export async function submitChecklistItem(ctx: AuthContext, itemId: string): Promise<void> {
+export async function submitChecklistItem(
+  ctx: AuthContext,
+  itemId: string,
+  fileId?: string,
+): Promise<void> {
   const item = await loadItem(itemId);
   const access = await assertProjectAccess(ctx, item.projectId, "write");
 
@@ -300,7 +334,13 @@ export async function submitChecklistItem(ctx: AuthContext, itemId: string): Pro
 
   db.transaction((tx) => {
     tx.update(checklistItem)
-      .set({ status: "submitted", completedAt: new Date(), updatedAt: new Date() })
+      .set({
+        status: "submitted",
+        completedAt: new Date(),
+        submittedAt: new Date(),
+        ...(fileId ? { fileId } : {}),
+        updatedAt: new Date(),
+      })
       .where(eq(checklistItem.id, itemId))
       .run();
 
@@ -566,6 +606,128 @@ export async function countPendingDocuments(ctx: AuthContext): Promise<number> {
   return Number(rows[0]?.total ?? 0);
 }
 
+/** Tra tên tệp + số phiên bản mới nhất cho danh sách file id. */
+async function lookupFiles(fileIds: string[]) {
+  const map = new Map<
+    string,
+    { name: string; versionNumber: number | null; versionId: string | null }
+  >();
+  if (fileIds.length === 0) return map;
+
+  const rows = await db
+    .select({
+      id: fileAsset.id,
+      name: fileAsset.name,
+      currentVersionId: fileAsset.currentVersionId,
+      versionNumber: fileVersion.versionNumber,
+    })
+    .from(fileAsset)
+    .leftJoin(fileVersion, eq(fileAsset.currentVersionId, fileVersion.id))
+    .where(inArray(fileAsset.id, fileIds));
+
+  for (const row of rows) {
+    map.set(row.id, {
+      name: row.name,
+      versionNumber: row.versionNumber ?? null,
+      versionId: row.currentVersionId ?? null,
+    });
+  }
+  return map;
+}
+
+/** Đoán loại tệp từ phần mở rộng để phân loại trong kho tệp. */
+function kindFromName(fileName: string): "design" | "document" | "image" | "video" | "other" {
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  if (["png", "jpg", "jpeg", "webp", "gif", "svg"].includes(ext)) return "image";
+  if (["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "md", "csv"].includes(ext)) return "document";
+  if (["ai", "psd", "fig", "sketch", "indd", "eps"].includes(ext)) return "design";
+  if (["mp4", "mov", "avi", "mkv"].includes(ext)) return "video";
+  return "other";
+}
+
+/**
+ * Khách nộp tài liệu cho một mục checklist (AC-ONB-002).
+ * Tệp được lưu qua StoragePort và tạo phiên bản như mọi tệp khác — nên **có lịch sử**,
+ * không ghi đè, và PM xem/tải được ngay trong dự án.
+ */
+export async function submitChecklistItemWithFile(
+  ctx: AuthContext,
+  input: { itemId: string; fileName: string; note?: string; data: Uint8Array },
+): Promise<{ fileId: string; versionNumber: number }> {
+  const item = await loadItem(input.itemId);
+  await assertProjectAccess(ctx, item.projectId, "write");
+
+  if (item.status === "approved") {
+    throw new DomainError("INVALID_INPUT", "Mục này đã được duyệt nên không nộp lại");
+  }
+
+  // Nộp lại sau khi bị yêu cầu bổ sung → thêm phiên bản mới cho chính tệp đó.
+  let fileId = item.fileId;
+  if (!fileId) {
+    fileId = await createFile(ctx, {
+      projectId: item.projectId,
+      name: item.label,
+      kind: kindFromName(input.fileName),
+      visibility: "client",
+    });
+  }
+
+  const version = await addVersion(ctx, {
+    fileId,
+    fileName: input.fileName,
+    note: input.note ?? `Nộp cho mục: ${item.label}`,
+    data: input.data,
+  });
+
+  await submitChecklistItem(ctx, input.itemId, fileId);
+
+  return { fileId, versionNumber: version.versionNumber };
+}
+
+/** Khách nộp tệp cho một "tài liệu cần cung cấp". */
+export async function uploadDocumentFile(
+  ctx: AuthContext,
+  input: { documentId: string; fileName: string; data: Uint8Array },
+): Promise<{ fileId: string; versionNumber: number }> {
+  const rows = await db
+    .select({
+      id: documentRequest.id,
+      projectId: documentRequest.projectId,
+      label: documentRequest.label,
+      fileId: documentRequest.fileId,
+      status: documentRequest.status,
+    })
+    .from(documentRequest)
+    .where(eq(documentRequest.id, input.documentId))
+    .limit(1);
+
+  const doc = rows[0];
+  if (!doc) throw new DomainError("INVALID_INPUT", "Không tìm thấy yêu cầu tài liệu");
+
+  await assertProjectAccess(ctx, doc.projectId, "write");
+
+  let fileId = doc.fileId;
+  if (!fileId) {
+    fileId = await createFile(ctx, {
+      projectId: doc.projectId,
+      name: doc.label,
+      kind: kindFromName(input.fileName),
+      visibility: "client",
+    });
+  }
+
+  const version = await addVersion(ctx, {
+    fileId,
+    fileName: input.fileName,
+    note: `Tài liệu: ${doc.label}`,
+    data: input.data,
+  });
+
+  await markDocumentReceived(ctx, { documentId: input.documentId, fileId });
+
+  return { fileId, versionNumber: version.versionNumber };
+}
+
 async function loadItem(itemId: string) {
   const rows = await db
     .select({
@@ -573,6 +735,8 @@ async function loadItem(itemId: string) {
       checklistId: checklistItem.checklistId,
       status: checklistItem.status,
       ownerSide: checklistItem.ownerSide,
+      fileId: checklistItem.fileId,
+      label: checklistItem.label,
       projectId: onboardingChecklist.projectId,
     })
     .from(checklistItem)

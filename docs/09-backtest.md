@@ -107,15 +107,15 @@ npm run dev
 |---|---|---|---|
 | B1 | `npm run typecheck` | Kết thúc bằng `✓ Types generated successfully`, **0 dòng `error TS`** | [ ] |
 | B2 | `npm run lint` | Không in ra dòng `error`/`warning` nào | [ ] |
-| B3 | `npm test` | `Test Files 11 passed (11)` · `Tests 104 passed (104)` | [ ] |
+| B3 | `npm test` | `Test Files 12 passed (12)` · `Tests 113 passed (113)` | [ ] |
 | B4 | `npm run build` | `✓ Compiled successfully` · danh sách route có **23 dòng** | [ ] |
 | B5 | `npm run pg:dry-run` | In bảng số dòng + `Tổng` (đối chiếu mốc A6) | [ ] |
 | B6 | `npm run outbox` | `Outbox: xử lý 1, gửi 1, lỗi 0` (lần đầu) — lần hai phải là `xử lý 0` | [ ] |
 
-**B3 — chi tiết 11 file test (nếu lệch số, ghi lại tên file lệch):**
+**B3 — chi tiết 12 file test (nếu lệch số, ghi lại tên file lệch):**
 ```
 format · nav · permissions · ai                       (unit)
-files · onboarding · growth · outbox · isolation · ai-tools · project-access   (integration)
+files · onboarding · growth · outbox · isolation · ai-tools · project-access · reset-order
 ```
 
 > `npm run build` sẽ tạo `.next` (~250 MB). Chạy xong nên `rm -rf .next` nếu ổ đĩa chật —
@@ -168,13 +168,17 @@ Vai trò: **Client Member** (`vy.ngo@anphatland.vn`) → **PM** (`minhanh@saokim
 |---|---|---|---|---|
 | C2.1 | Vy | Mở `/onboarding` | Thấy dự án **Website An Phát Land**, tiến độ **60%** | [ ] |
 | C2.2 | Vy | Đếm 5 mục | `Hồ sơ doanh nghiệp` ✅ · `Tài sản thương hiệu hiện có` ✅ · `Nội dung giới thiệu dự án` **Cần làm** · `Thông tin hosting & domain` **Đã nộp** · `Xác nhận lịch kickoff` ✅ | [ ] |
-| C2.3 | Vy | Bấm **Đánh dấu đã nộp** ở mục "Nội dung giới thiệu dự án" | Toast **"Đã nộp mục này"**; trạng thái mục → **Đã nộp**; tiến độ **vẫn 60%** (vì chưa được duyệt) | [ ] |
+| C2.3 | Vy | Ở mục "Nội dung giới thiệu dự án": **chọn một tệp bất kỳ** (pdf/ảnh) rồi bấm **Nộp** | Toast **`Đã nộp <tên-tệp> (phiên bản 1)`**; mục → **Đã nộp** kèm dòng 📎 *tên tệp v1* + link **Tải**; tiến độ **vẫn 60%** (nộp ≠ được duyệt) | [ ] |
+| C2.3b | Vy | Bấm **Tải** ở tệp vừa nộp | Tệp tải về đúng nội dung bạn vừa chọn | [ ] |
+| C2.3c | Vy | Nộp lại mục đó **sau khi PM yêu cầu bổ sung** (làm ở C2.6 rồi quay lại) | Toast **`Đã nộp <tên-tệp> (phiên bản 2)`** — cùng một tệp, **thêm phiên bản**, không tạo tệp trùng | [ ] |
 | C2.4 | Vy | Mở lại Brand brief, sửa 1 ô rồi bấm **Lưu nháp** | Toast **"Đã lưu nháp"** | [ ] |
 | C2.5 | Vy→PM | Đăng xuất, đăng nhập `minhanh@saokim.vn`, mở `/onboarding` | Thấy nút **Đạt** và **Yêu cầu bổ sung** (khách không có 2 nút này) | [ ] |
 | C2.6 | PM | Ở mục "Nội dung giới thiệu dự án", gõ lý do vào ô "Cần bổ sung gì?" rồi bấm **Yêu cầu bổ sung** | Toast **"Đã yêu cầu bổ sung"**; mục → **Cần bổ sung**, có dòng `PM yêu cầu: …` | [ ] |
 | C2.7 | PM | Bấm **Đạt** ở mục đó | Toast **"Đã duyệt mục"**; tiến độ **80%** | [ ] |
 | C2.8 | PM | Bấm **Hoàn tất onboarding** (KHÔNG tick override) | Toast lỗi **"Còn 1 mục bắt buộc chưa đạt"** (mục hosting còn ở "Đã nộp") | [ ] |
 | C2.9 | PM | Gõ lý do vào ô "Lý do bỏ qua" rồi bấm **Hoàn tất onboarding** | Toast **"Onboarding đã hoàn tất"**; checklist → **Hoàn tất** | [ ] |
+| C2.10 | Vy | Ở khối **Tài liệu yêu cầu**, xem 2 dòng | Nhãn đúng: `Nội dung giới thiệu dự án` → **Cần nộp** · `Thông tin hosting & domain` → **Đã nhận** | [ ] |
+| C2.11 | Vy | Ở dòng **Cần nộp**, chọn tệp rồi bấm **Nộp** | Toast **`Đã nộp <tên-tệp> (phiên bản 1)`**; nhãn chuyển **Đã nhận** + có link tải | [ ] |
 
 > **C2.3 kiểm tra điều quan trọng:** nộp ≠ đạt. Tiến độ chỉ tính mục **đã được PM duyệt**.
 > **C2.8 kiểm tra cổng kickoff:** không được bỏ qua mục bắt buộc mà không có lý do.
@@ -370,7 +374,7 @@ npm run pg:dry-run
 | A | Chuẩn bị môi trường | 6 | ___/6 | |
 | B | Cổng tự động | 6 | ___/6 | |
 | C1 | Đăng nhập & phân quyền | 8 | ___/8 | |
-| C2 | Onboarding | 9 | ___/9 | |
+| C2 | Onboarding | 12 | ___/12 | |
 | C3 | Delivery vòng đời phiên bản | 14 | ___/14 | |
 | C4 | Bàn giao | 5 | ___/5 | |
 | C5 | AI-native | 11 | ___/11 | |
@@ -378,7 +382,7 @@ npm run pg:dry-run
 | C7 | Growth & Retaining | 13 | ___/13 | |
 | D | Kiểm tra âm | 12 | ___/12 | |
 | E | Kiểm tra dữ liệu | 7 | ___/7 | |
-| | **TỔNG** | **98** | **___/98** | |
+| | **TỔNG** | **101** | **___/101** | |
 
 **Ghi lại khi có lỗi:**
 ```
@@ -415,6 +419,7 @@ npm run pg:dry-run              # phải quay về Tổng = 131 (mốc A6)
 | AI báo lỗi đỏ trong panel | key sai/hết hạn/mất mạng | Sửa `DEEPSEEK_API_KEY` trong `.env.local` rồi **khởi động lại dev**; hoặc tạm đặt `AI_DRIVER=mock` để backtest phần còn lại |
 | AI luôn có nhãn `demo` dù đã có key | `.env.local` chưa được nạp | Dev server phải **khởi động lại** sau khi sửa `.env.local` |
 | AI trả lời *"Đã đạt hạn mức AI hôm nay…"* | Đã vượt 5 USD/ngày (hoặc bạn test cap) | Tăng `AI_DAILY_COST_CAP_USD`, hoặc xoá log: `node -e "const D=require('better-sqlite3');new D('./data/app.db').prepare('delete from ai_run').run()"` |
+| `npm run db:seed -- --reset` báo `FOREIGN KEY constraint failed` | thứ tự xoá trong `src/db/reset-order.ts` sai (bảng con phải đứng trước bảng cha) | Sửa thứ tự; test `tests/integration/reset-order.test.ts` sẽ bắt lỗi này trước cả khi bạn reset |
 | `npm test` fail sau khi bạn sửa code | code lệch khỏi hành vi đã chốt | Đọc tên test fail — mỗi test ghi rõ mã AC/NFR tương ứng |
 | Muốn chạy lại chỉ phần test tự động | — | `npm test` · một file: `npx vitest run tests/integration/files.test.ts` |
 

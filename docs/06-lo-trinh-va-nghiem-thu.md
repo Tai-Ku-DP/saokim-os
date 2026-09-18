@@ -101,7 +101,7 @@ Một feature xong khi **tất cả** điều sau đúng:
 | ID | Test |
 |---|---|
 | AC-ONB-001 | `test/onboarding.spec.ts`: tạo dự án theo `project_type` → checklist sinh đúng template |
-| AC-ONB-002 | client upload tài liệu theo từng `checklist_item` |
+| AC-ONB-002 | client upload tài liệu theo từng `checklist_item` — tệp lưu qua StoragePort, tạo phiên bản thật, gắn `checklist_item.file_id`, tải lại được |
 | AC-ONB-003 | PM nhận notification khi client upload |
 | AC-ONB-004 | client thấy `completion_rate` chính xác |
 | AC-ONB-005 | chuyển `ready_for_kickoff` bị chặn khi thiếu mục bắt buộc; PM override phải có `reason` |

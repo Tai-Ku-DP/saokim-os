@@ -5,6 +5,9 @@ import { db } from "@/db";
 import {
   auditLog,
   checklistItem,
+  documentRequest,
+  fileAsset,
+  fileVersion,
   notificationOutbox,
   onboardingChecklist,
   organization,
@@ -17,12 +20,16 @@ import {
   ONBOARDING_TEMPLATES,
   completeChecklist,
   createChecklistForProject,
+  createDocumentRequest,
   getChecklistView,
   reviewChecklistItem,
   saveBrandBrief,
   getBrandBrief,
   submitChecklistItem,
+  submitChecklistItemWithFile,
+  uploadDocumentFile,
 } from "@/server/services/onboarding";
+import { listProjectFiles } from "@/server/services/files";
 
 /**
  * Acceptance criteria Onboarding (PRD §8.5):
@@ -178,6 +185,148 @@ describe("AC-ONB-002/003/004 — nộp mục, thông báo, tiến độ", () => 
     await expect(
       reviewChecklistItem(designer, { itemId: view!.items[0]!.id, decision: "approved" }),
     ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  });
+});
+
+describe("AC-ONB-002 — NỘP TỆP thật cho từng mục (không chỉ đổi trạng thái)", () => {
+  beforeEach(reset);
+
+  it("nộp tệp tạo tệp + phiên bản, gắn vào mục và PM tải được", async () => {
+    const checklistId = await createChecklistForProject(pm, PROJECT);
+    const view = await getChecklistView(pm, checklistId);
+    const item = view!.items.find((i) => i.ownerSide === "client" && i.required)!;
+
+    const result = await submitChecklistItemWithFile(clientOwner, {
+      itemId: item.id,
+      fileName: "ho-so-doanh-nghiep.pdf",
+      note: "Bản đầy đủ",
+      data: new TextEncoder().encode("%PDF-1.4 nội dung giả"),
+    });
+
+    // 1) mục đã gắn tệp + trạng thái đã nộp + có mốc thời gian nộp
+    const row = await db.select().from(checklistItem).where(eq(checklistItem.id, item.id));
+    expect(row[0]?.status).toBe("submitted");
+    expect(row[0]?.fileId).toBe(result.fileId);
+    expect(row[0]?.submittedAt).toBeInstanceOf(Date);
+
+    // 2) tệp và phiên bản thật sự được tạo
+    const files = await db.select().from(fileAsset).where(eq(fileAsset.id, result.fileId));
+    expect(files).toHaveLength(1);
+    expect(files[0]?.name).toBe(item.label);
+    expect(files[0]?.visibility).toBe("client");
+
+    const versions = await db.select().from(fileVersion).where(eq(fileVersion.fileId, result.fileId));
+    expect(versions).toHaveLength(1);
+    expect(versions[0]?.versionNumber).toBe(1);
+    expect(versions[0]?.status).toBe("in_review");
+
+    // 3) tệp xuất hiện trong danh sách tệp của dự án (PM làm việc được với nó)
+    const projectFiles = await listProjectFiles(pm, PROJECT);
+    expect(projectFiles.some((f) => f.id === result.fileId)).toBe(true);
+
+    // 4) view trả thông tin tệp để UI hiện link tải
+    const after = await getChecklistView(pm, checklistId);
+    const viewItem = after!.items.find((i) => i.id === item.id)!;
+    expect(viewItem.fileLabel).toBe(item.label);
+    expect(viewItem.fileVersion).toBe(1);
+    expect(viewItem.fileVersionId).toBe(versions[0]?.id);
+  });
+
+  it("nộp lại sau khi bị yêu cầu bổ sung thì tạo PHIÊN BẢN MỚI, không tạo tệp trùng", async () => {
+    const checklistId = await createChecklistForProject(pm, PROJECT);
+    const view = await getChecklistView(pm, checklistId);
+    const item = view!.items.find((i) => i.ownerSide === "client")!;
+
+    const first = await submitChecklistItemWithFile(clientOwner, {
+      itemId: item.id,
+      fileName: "ban-1.pdf",
+      data: new TextEncoder().encode("v1"),
+    });
+
+    await reviewChecklistItem(pm, { itemId: item.id, decision: "rejected", note: "Thiếu phụ lục" });
+
+    const second = await submitChecklistItemWithFile(clientOwner, {
+      itemId: item.id,
+      fileName: "ban-2.pdf",
+      data: new TextEncoder().encode("v2"),
+    });
+
+    // cùng một tệp, thêm phiên bản — không sinh tệp thứ hai
+    expect(second.fileId).toBe(first.fileId);
+    expect(second.versionNumber).toBe(2);
+    expect(await db.select().from(fileAsset).where(eq(fileAsset.name, item.label))).toHaveLength(1);
+
+    const versions = await db.select().from(fileVersion).where(eq(fileVersion.fileId, first.fileId));
+    expect(versions.map((v) => v.versionNumber).sort()).toEqual([1, 2]);
+  });
+
+  it("mục đã được duyệt thì không nộp lại được", async () => {
+    const checklistId = await createChecklistForProject(pm, PROJECT);
+    const view = await getChecklistView(pm, checklistId);
+    const item = view!.items.find((i) => i.ownerSide === "client")!;
+
+    await submitChecklistItemWithFile(clientOwner, {
+      itemId: item.id,
+      fileName: "x.pdf",
+      data: new TextEncoder().encode("x"),
+    });
+    await reviewChecklistItem(pm, { itemId: item.id, decision: "approved" });
+
+    await expect(
+      submitChecklistItemWithFile(clientOwner, {
+        itemId: item.id,
+        fileName: "y.pdf",
+        data: new TextEncoder().encode("y"),
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+  });
+
+  it("nộp tệp cho 'tài liệu cần cung cấp' chuyển trạng thái sang đã nhận", async () => {
+    const checklistId = await createChecklistForProject(pm, PROJECT);
+    await createDocumentRequest(pm, { projectId: PROJECT, label: "Sơ đồ tổ chức" });
+    const docs = await db.select().from(documentRequest);
+    const doc = docs.find((d) => d.label === "Sơ đồ tổ chức")!;
+    expect(doc.status).toBe("pending");
+    expect(doc.fileId).toBeNull();
+
+    const result = await uploadDocumentFile(clientOwner, {
+      documentId: doc.id,
+      fileName: "so-do-to-chuc.pdf",
+      data: new TextEncoder().encode("pdf"),
+    });
+
+    const after = await db.select().from(documentRequest).where(eq(documentRequest.id, doc.id));
+    expect(after[0]?.status).toBe("received");
+    expect(after[0]?.fileId).toBe(result.fileId);
+    expect(after[0]?.receivedAt).toBeInstanceOf(Date);
+
+    const view = await getChecklistView(pm, checklistId);
+    const viewDoc = view!.documents.find((d) => d.id === doc.id)!;
+    expect(viewDoc.fileLabel).toBe("Sơ đồ tổ chức");
+    expect(viewDoc.fileVersionId).toBeTruthy();
+  });
+
+  it("nhân sự không có quyền ghi cũng không nộp được (enforce ở service)", async () => {
+    const checklistId = await createChecklistForProject(pm, PROJECT);
+    const view = await getChecklistView(pm, checklistId);
+    const item = view!.items.find((i) => i.ownerSide === "client")!;
+
+    const outsider: AuthContext = {
+      kind: "client",
+      userId: "u_outsider",
+      name: "Người ngoài",
+      email: "out@x.vn",
+      role: "member",
+      organizationId: "org_khac",
+    };
+
+    await expect(
+      submitChecklistItemWithFile(outsider, {
+        itemId: item.id,
+        fileName: "hack.pdf",
+        data: new TextEncoder().encode("x"),
+      }),
+    ).rejects.toBeInstanceOf(Error);
   });
 });
 
