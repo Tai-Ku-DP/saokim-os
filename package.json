@@ -14,10 +14,10 @@
     "db:generate": "drizzle-kit generate --config=drizzle.sqlite.config.ts",
     "db:migrate": "drizzle-kit migrate --config=drizzle.sqlite.config.ts",
     "db:studio": "drizzle-kit studio --config=drizzle.sqlite.config.ts",
-    "db:seed": "tsx scripts/seed.ts",
+    "db:seed": "tsx --conditions=react-server scripts/seed.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "outbox": "tsx scripts/outbox-worker.ts"
+    "outbox": "tsx --conditions=react-server scripts/outbox-worker.ts"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "3.0.47",

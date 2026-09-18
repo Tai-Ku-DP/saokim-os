@@ -5,6 +5,7 @@ import { getViewer } from "@/server/auth/viewer";
 import { getAuthContext } from "@/server/auth/guard";
 import { can } from "@/server/auth/access";
 import { aiDriver } from "@/ai/client";
+import { unreadCount as unreadNotifications } from "@/server/notifications";
 
 /**
  * Khung ứng dụng dùng chung cho mọi màn hình trong (app):
@@ -21,6 +22,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
   const aiCanWrite = ctx ? can(ctx, { ai: ["use_write_tools"] }) : false;
   const aiDemo = aiDriver() === "mock";
+  const unread = ctx ? await unreadNotifications(ctx) : 0;
 
   return (
     <SidebarProvider>
@@ -29,7 +31,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         workspaceName={viewer.organizationName ?? "Sao Kim Branding"}
       />
       <SidebarInset className="min-w-0 bg-bg">
-        <Topbar viewer={viewer} aiCanWrite={aiCanWrite} aiDemo={aiDemo} />
+        <Topbar viewer={viewer} aiCanWrite={aiCanWrite} aiDemo={aiDemo} unreadCount={unread} />
         <main className="min-w-0 flex-1">{children}</main>
       </SidebarInset>
     </SidebarProvider>

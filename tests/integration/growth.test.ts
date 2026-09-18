@@ -13,7 +13,6 @@ import {
   project,
   projectMember,
   servicePackage,
-  serviceRequest,
   user,
 } from "@/db/sqlite/schema";
 import type { AuthContext } from "@/server/auth/access";
