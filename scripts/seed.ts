@@ -411,7 +411,8 @@ async function main() {
     source: "service_request",
     serviceId: "seed_service_guideline",
     stage: "qualified",
-    valueCents: 6_000_000_00,
+    // 60 triệu VND = 6_000_000_000 cents (khớp khoảng giá gói Brand guideline 40–80 triệu)
+    valueCents: 6_000_000_000,
     currency: "VND",
     ownerId: "seed_user_account",
     createdAt: daysAgo(11),

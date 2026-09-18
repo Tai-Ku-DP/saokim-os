@@ -20,11 +20,21 @@ export type ProjectAccess = {
   pmId: string | null;
 };
 
-export async function assertProjectAccess(
+export type ProjectAccessResult =
+  | { allowed: true; access: ProjectAccess }
+  | { allowed: false; message: string };
+
+/**
+ * Quyết định truy cập dự án **không ném** — dùng ở tầng trang, nơi "không có quyền"
+ * phải thành 404 thay vì lỗi 500 (docs/03 §4, AGENTS.md §5).
+ *
+ * Server Action / Route Handler vẫn dùng `assertProjectAccess` để phân biệt được 403.
+ */
+export async function checkProjectAccess(
   ctx: AuthContext,
   projectId: string,
   level: ProjectAccessLevel = "read",
-): Promise<ProjectAccess> {
+): Promise<ProjectAccessResult> {
   const rows = await db
     .select({
       id: project.id,
@@ -37,7 +47,7 @@ export async function assertProjectAccess(
     .limit(1);
 
   const found = rows[0];
-  if (!found || found.deletedAt) throw new ForbiddenError("Không tìm thấy dự án");
+  if (!found || found.deletedAt) return { allowed: false, message: "Không tìm thấy dự án" };
 
   const assignmentRows = await db
     .select({ access: projectMember.access })
@@ -56,19 +66,34 @@ export async function assertProjectAccess(
   );
 
   if (!decision.allowed) {
-    throw new ForbiddenError(
-      decision.reason === "cross_org"
-        ? "Dữ liệu thuộc công ty khác"
-        : "Bạn chưa được phân công vào dự án này",
-    );
+    return {
+      allowed: false,
+      message:
+        decision.reason === "cross_org"
+          ? "Dữ liệu thuộc công ty khác"
+          : "Bạn chưa được phân công vào dự án này",
+    };
   }
 
   return {
-    projectId: found.id,
-    organizationId: found.organizationId,
-    level,
-    pmId: found.pmId,
+    allowed: true,
+    access: {
+      projectId: found.id,
+      organizationId: found.organizationId,
+      level,
+      pmId: found.pmId,
+    },
   };
+}
+
+export async function assertProjectAccess(
+  ctx: AuthContext,
+  projectId: string,
+  level: ProjectAccessLevel = "read",
+): Promise<ProjectAccess> {
+  const result = await checkProjectAccess(ctx, projectId, level);
+  if (!result.allowed) throw new ForbiddenError(result.message);
+  return result.access;
 }
 
 /** Chặn truy cập chéo tổ chức cho dữ liệu không thuộc dự án (brand vault, growth…). */

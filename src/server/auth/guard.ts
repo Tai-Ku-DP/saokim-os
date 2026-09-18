@@ -27,7 +27,13 @@ import type { ClientOrgRole } from "./permissions";
 
 export { ForbiddenError, UnauthenticatedError } from "./access";
 export type { AuthContext, PermissionRequest, ProjectAccessLevel } from "./access";
-export { assertProjectAccess, requireOrgScope, type ProjectAccess } from "./project-access";
+export {
+  assertProjectAccess,
+  checkProjectAccess,
+  requireOrgScope,
+  type ProjectAccess,
+  type ProjectAccessResult,
+} from "./project-access";
 
 /** Đọc session + membership một lần cho mỗi request. */
 export const getAuthContext = cache(async (): Promise<AuthContext | null> => {

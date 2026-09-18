@@ -14,7 +14,7 @@ import {
 } from "@/db/sqlite/schema";
 import type { ProjectStatus, ProjectType } from "@/db/types";
 import { can, type AuthContext } from "@/server/auth/access";
-import { assertProjectAccess } from "@/server/auth/project-access";
+import { assertProjectAccess, checkProjectAccess } from "@/server/auth/project-access";
 
 /**
  * Truy vấn dự án — luôn scope theo quyền (docs/03 §4).
@@ -153,11 +153,19 @@ export async function listProjects(ctx: AuthContext): Promise<ProjectListItem[]>
   }));
 }
 
+/**
+ * Header dự án cho **tầng trang**: `null` khi không có quyền hoặc dự án không tồn tại.
+ *
+ * Không ném `ForbiddenError` để page dịch thành `notFound()` — người dùng không bị ném
+ * vào error boundary chung, và cũng không lộ dự án nào đang tồn tại (docs/03 §4).
+ * Thao tác ghi vẫn luôn đi qua `assertProjectAccess` (403 có phân biệt lý do).
+ */
 export async function getProjectHeader(
   ctx: AuthContext,
   projectId: string,
 ): Promise<ProjectHeader | null> {
-  await assertProjectAccess(ctx, projectId, "read");
+  const access = await checkProjectAccess(ctx, projectId, "read");
+  if (!access.allowed) return null;
 
   const rows = await db
     .select({
