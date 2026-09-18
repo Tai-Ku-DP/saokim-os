@@ -141,14 +141,27 @@ export const statement = {
 
 ### Guard (một cửa duy nhất)
 ```ts
-// src/server/auth/guard.ts
+// src/server/auth/access.ts  — quyết định THUẦN (test được, không IO)
+can(role, { project: ["create"] })        // đánh giá theo ma trận
+mayAccessProject(ctx, shield, level)      // quyết định truy cập dự án
+
+// src/server/auth/guard.ts   — IO + enforcement
 requireSession()                                // → session hoặc redirect /sign-in
-requireStaff()                                  // user.type === "internal"
-requireClientOrg()                              // user.type === "client" + activeOrganizationId
-requirePermission({ project: ["approve"] })     // better-auth hasPermission
+requireStaff()                                  // ném ForbiddenError nếu không phải nội bộ
+requireClientOrg()                              // ném ForbiddenError nếu không phải khách hàng
+requirePermission({ project: ["approve"] })     // theo ma trận
 requireProjectAccess(projectId, "read"|"write"|"approve")
-requireOrgScope(orgId)                          // chặn truy cập chéo công ty
+requireOrgScope(ctx, organizationId)            // chặn truy cập chéo công ty
 ```
+
+**Cách resolve tổ chức của khách hàng:** ưu tiên `session.activeOrganizationId`; nếu chưa có
+(đăng nhập thường, magic link, tài khoản được seed) thì lấy membership đầu tiên của chính
+người dùng đó. Người dùng thuộc nhiều công ty chọn bằng `acceptInvitationAction` (đặt active
+organization sau khi nhận lời mời) hoặc org switcher ở topbar (P7).
+
+**Chuyển hướng theo vai trò (layout):** khách hàng vào `/inbox|/clients|/reports|/admin`
+bị đá về `/today`; người chưa đăng nhập bị đá về `/sign-in`. Trong Server Action thì
+`requireStaff()` **ném lỗi** (không redirect) để action trả về thông báo thay vì nhảy trang.
 
 **Luật cứng:**
 1. Mọi Server Action và Route Handler **tự authorize** — Next 16 coi action là POST endpoint công khai.

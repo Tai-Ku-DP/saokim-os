@@ -43,11 +43,17 @@
 | `@ai-sdk/react` | **4.0.108** | `useChat` + transport |
 | Provider dự phòng | `@ai-sdk/openai@4.0.69`, `@ai-sdk/google@4.0.74` | cắm thêm bằng config, không sửa code nghiệp vụ |
 
-### Kiểm thử
+### Kiểm thử & script
 | Thành phần | Version | Ghi chú |
 |---|---|---|
-| Vitest | **5.0.1** | unit: domain, permission, repository (SQLite in-memory) |
+| Vitest | **5.0.1** | unit: domain, permission, repository (SQLite in-memory **chạy migration thật**) |
+| tsx | **4.23.13** | chạy script TS ngoài Next (`scripts/seed.ts`, `scripts/outbox-worker.ts`) |
+| server-only | 0.0.1 | chặn import module server vào client |
 | Playwright | 1.63.0 *(Phase 3)* | dùng `channel: "chrome"` để **không tải browser** (tiết kiệm ~400MB đĩa) |
+
+**Quy tắc `server-only`:** đặt ở tầng service/guard (`src/server/**`), **không** đặt trong
+`src/db/sqlite/client.ts` hay `src/server/auth/index.ts` — better-auth CLI phải load được
+hai module này để sinh schema. Xem §6.
 
 ---
 
@@ -181,14 +187,25 @@ N8N_WEBHOOK_URL=               # đẩy signal sang n8n → Zalo/Odoo
 ```bash
 npm run dev            # next dev (Turbopack)
 npm run build          # next build (Turbopack) — cũng là cổng chất lượng
-npm run typecheck      # tsc --noEmit
+npm run typecheck      # next typegen && tsc --noEmit  (LayoutProps/PageProps do Next sinh)
 npm run lint           # eslint (next lint đã bị bỏ ở Next 16)
 npm run db:generate    # sinh migration từ schema
 npm run db:migrate     # áp migration
-npm run db:seed        # seed dữ liệu demo
+npm run db:seed        # seed dữ liệu demo (idempotent; -- --reset để tạo lại)
 npm test               # vitest
 npm run outbox         # chạy dispatcher notification (dev)
 ```
+
+**Sinh lại schema better-auth** (sau khi thêm/bớt plugin — nếu không, endpoint của plugin sẽ 500):
+
+```bash
+npx auth@1.7.5 generate --adapter drizzle --dialect sqlite \
+  --output src/db/sqlite/auth-schema.ts --config src/server/auth/index.ts -y
+npm run db:generate && npm run db:migrate
+```
+
+> File `src/db/sqlite/auth-schema.ts` do CLI sinh, **không sửa tay**. CLI dùng
+> `timestamp_ms` (khớp quy tắc portability §5) và tự thêm index/FK cần thiết.
 
 > Nếu npm không ghi được cache mặc định: thêm `npm_config_cache=/tmp/npm-cache` trước lệnh.
 

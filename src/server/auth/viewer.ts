@@ -1,21 +1,13 @@
 import "server-only";
 
-import { cookies } from "next/headers";
+import { getAuthContext, requireSession } from "./guard";
 import type { ViewerType } from "@/lib/nav";
 
 /**
- * Người dùng hiện tại.
+ * Người dùng hiện tại cho tầng UI (shell, điều hướng, phân quyền hiển thị).
  *
- * ⚠️ P1 (tạm thời): chưa nối better-auth. Hàm này trả về viewer giả để shell và
- * điều hướng chạy được, và cho phép đổi vai trò khi review giao diện:
- *
- *     document.cookie = "bc-viewer=pm"            // nhân sự Sao Kim
- *     document.cookie = "bc-viewer=client_owner"  // chủ doanh nghiệp khách hàng
- *
- * P2 sẽ thay toàn bộ thân hàm này bằng `auth.api.getSession({ headers: await headers() })`
- * và bổ sung `requireStaff`, `requireClientOrg`, `requireProjectAccess` trong
- * `src/server/auth/guard.ts` (docs/03 §4). Không nhánh code nào khác được đọc cookie
- * để suy ra quyền — đây là điểm thay thế duy nhất.
+ * Đây là lớp DUY NHẤT chuyển AuthContext (bảo mật) sang shape dùng cho giao diện.
+ * Không nhánh code nào khác được suy ra quyền từ cookie hay input của client.
  */
 
 export type StaffRole = "admin" | "pm" | "account" | "cs" | "designer" | "management";
@@ -26,84 +18,71 @@ export type Viewer = {
   name: string;
   email: string;
   type: ViewerType;
-  /** type = "internal" */
   staffRole?: StaffRole;
-  /** type = "client" */
   clientRole?: ClientRole;
   organizationId?: string;
   organizationName?: string;
   title: string;
 };
 
-const DEMO_VIEWERS: Record<string, Viewer> = {
-  pm: {
-    id: "demo-pm",
-    name: "Nguyễn Minh Anh",
-    email: "minhanh@saokim.vn",
-    type: "internal",
-    staffRole: "pm",
-    title: "Quản lý dự án",
-  },
-  admin: {
-    id: "demo-admin",
-    name: "Trần Quốc Bảo",
-    email: "quocbao@saokim.vn",
-    type: "internal",
-    staffRole: "admin",
-    title: "Quản trị hệ thống",
-  },
-  account: {
-    id: "demo-account",
-    name: "Lê Thu Hà",
-    email: "thuha@saokim.vn",
-    type: "internal",
-    staffRole: "account",
-    title: "Quản lý khách hàng",
-  },
-  cs: {
-    id: "demo-cs",
-    name: "Phạm Gia Linh",
-    email: "gialinh@saokim.vn",
-    type: "internal",
-    staffRole: "cs",
-    title: "Chăm sóc khách hàng",
-  },
-  designer: {
-    id: "demo-designer",
-    name: "Đỗ Hoàng Nam",
-    email: "hoangnam@saokim.vn",
-    type: "internal",
-    staffRole: "designer",
-    title: "Designer",
-  },
-  client_owner: {
-    id: "demo-client-owner",
-    name: "Vũ Thanh Tùng",
-    email: "tung.vu@anphatland.vn",
-    type: "client",
-    clientRole: "client_owner",
-    organizationId: "demo-org-anphat",
-    organizationName: "An Phát Land",
-    title: "Giám đốc Marketing",
-  },
-  client_member: {
-    id: "demo-client-member",
-    name: "Ngô Khánh Vy",
-    email: "vy.ngo@anphatland.vn",
-    type: "client",
-    clientRole: "client_member",
-    organizationId: "demo-org-anphat",
-    organizationName: "An Phát Land",
-    title: "Chuyên viên marketing",
-  },
+const STAFF_TITLES: Record<StaffRole, string> = {
+  admin: "Quản trị hệ thống",
+  pm: "Quản lý dự án",
+  account: "Quản lý khách hàng",
+  cs: "Chăm sóc khách hàng",
+  designer: "Designer",
+  management: "Ban lãnh đạo",
+};
+
+const CLIENT_TITLES: Record<ClientRole, string> = {
+  client_owner: "Chủ doanh nghiệp",
+  client_member: "Thành viên",
 };
 
 export async function getViewer(): Promise<Viewer> {
-  const store = await cookies();
-  const requested = store.get("bc-viewer")?.value;
-  const demo = requested ? DEMO_VIEWERS[requested] : undefined;
-  if (demo) return demo;
+  const ctx = await requireSession();
 
-  // Mặc định khi review: PM của Sao Kim.
-  return DEMO_VIEWERS.pm;
+  if (ctx.kind === "staff") {
+    return {
+      id: ctx.userId,
+      name: ctx.name,
+      email: ctx.email,
+      type: "internal",
+      staffRole: ctx.role,
+      title: STAFF_TITLES[ctx.role],
+    };
+  }
+
+  return {
+    id: ctx.userId,
+    name: ctx.name,
+    email: ctx.email,
+    type: "client",
+    clientRole: ctx.role === "owner" ? "client_owner" : "client_member",
+    organizationId: ctx.organizationId,
+    organizationName: await organizationName(ctx.organizationId),
+    title: CLIENT_TITLES[ctx.role === "owner" ? "client_owner" : "client_member"],
+  };
+}
+
+/** Tên công ty hiển thị ở sidebar. Tách riêng để dễ cache/thay nguồn sau này. */
+async function organizationName(organizationId: string): Promise<string | undefined> {
+  const { db } = await import("@/db");
+  const { organization } = await import("@/db/sqlite/schema");
+  const { eq } = await import("drizzle-orm");
+
+  const rows = await db
+    .select({ name: organization.name })
+    .from(organization)
+    .where(eq(organization.id, organizationId))
+    .limit(1);
+
+  return rows[0]?.name;
+}
+
+/** Dùng ở layout/server component khi chỉ cần biết đã đăng nhập chưa (không redirect). */
+export async function peekViewerType(): Promise<ViewerType | null> {
+  const ctx = await getAuthContext();
+  if (!ctx) return null;
+  return ctx.kind === "staff" ? "internal" : "client";
 }

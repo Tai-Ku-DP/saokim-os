@@ -60,23 +60,23 @@ AI SDK 7.0.105 + @ai-sdk/deepseek 3.0.47 (generative UI bằng tool-calling)
 |---|---|---|
 | P0 | Nền tảng: Next 16, token, shadcn, pin version | ✅ xong |
 | P1 | Design system + app shell + ⌘K + light/dark | ✅ xong |
-| P2 | Drizzle schema + migration + seed + better-auth + RBAC | ⏳ tiếp theo |
-| P3 | Today · Projects · File review · Approvals · Handover | ⏳ |
+| P2 | Drizzle schema (39 bảng) + migration + seed + better-auth + RBAC 2 tầng + guard + login/invite | ✅ xong |
+| P3 | Today · Projects · File review · Approvals · Handover | ⏳ tiếp theo |
 | P4 | Onboarding hub | ⏳ |
 | P5 | AI gateway + generative UI + 6 tính năng AI | ⏳ |
 | P6 | Growth + Retaining (Brand Home) | ⏳ |
 | P7 | Outbox/notification + n8n + dashboards | ⏳ |
 | P8 | Hardening + a11y + runbook Postgres | ⏳ |
 
-### Ghi chú khi review P1
+### Tài khoản demo (sau `npm run db:seed`)
 
-Điều hướng đổi theo vai trò. Chưa nối better-auth, nên để xem giao diện khách hàng:
+| Email | Vai trò |
+|---|---|
+| `admin@saokim.vn` | Quản trị hệ thống |
+| `minhanh@saokim.vn` | PM Sao Kim |
+| `thuha@saokim.vn` / `gialinh@saokim.vn` / `hoangnam@saokim.vn` | Account / CS / Designer |
+| `tung.vu@anphatland.vn` | Client Owner (được duyệt) |
+| `vy.ngo@anphatland.vn` | Client Member (không được duyệt) |
 
-```js
-// trong DevTools console
-document.cookie = "bc-viewer=client_owner"; location.reload();   // chủ doanh nghiệp khách hàng
-document.cookie = "bc-viewer=client_member"; location.reload();  // nhân viên khách hàng
-document.cookie = "bc-viewer=pm"; location.reload();             // PM Sao Kim (mặc định)
-```
-
-Cơ chế tạm này nằm duy nhất trong `src/server/auth/viewer.ts` và sẽ bị xoá ở P2.
+Mật khẩu chung: **`BrandCare@2026`**. Khách hàng vào `/inbox|/clients|/reports|/admin`
+sẽ bị chuyển về `/today`.

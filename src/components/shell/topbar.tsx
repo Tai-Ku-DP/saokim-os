@@ -17,6 +17,7 @@ import {
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CommandPalette } from "@/components/shell/command-palette";
+import { signOutAction } from "@/server/actions/auth";
 import { cn } from "@/lib/utils";
 import type { Viewer } from "@/server/auth/viewer";
 
@@ -120,9 +121,13 @@ export function Topbar({ viewer, unreadCount = 0 }: { viewer: Viewer; unreadCoun
             <ThemeItems />
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => router.push("/settings")}>Cài đặt</DropdownMenuItem>
-            <DropdownMenuItem disabled>
-              <LogOut size={14} aria-hidden /> Đăng xuất (P2)
-            </DropdownMenuItem>
+            <form action={signOutAction}>
+              <DropdownMenuItem asChild>
+                <button type="submit" className="w-full cursor-pointer">
+                  <LogOut size={14} aria-hidden /> Đăng xuất
+                </button>
+              </DropdownMenuItem>
+            </form>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
